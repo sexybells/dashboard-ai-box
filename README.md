@@ -86,6 +86,12 @@ Khong dung `localhost` trong AI Box, vi `localhost` se tro ve chinh AI Box. Cung
 
 ## Deploy public free
 
+Deploy nhanh bang Render Blueprint:
+
+```text
+https://render.com/deploy?repo=https://github.com/sexybells/dashboard-ai-box
+```
+
 Huong dan deploy len Render Free + MongoDB Atlas Free nam o:
 
 ```text

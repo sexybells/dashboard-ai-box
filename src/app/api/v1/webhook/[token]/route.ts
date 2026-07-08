@@ -1,4 +1,4 @@
-import { handleAiBoxWebhookRequest } from "./handler";
+import { handleAiBoxWebhookRequest } from "@/app/api/webhooks/aibox/handler";
 
 export const runtime = "nodejs";
 

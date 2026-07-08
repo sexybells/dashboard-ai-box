@@ -51,6 +51,7 @@ Luu y: AI Box cua ban dang la `192.168.1.26`. Neu may Mac la `192.168.88.134` th
 ## Endpoint
 
 - `POST /api/webhooks/aibox`: nhan callback alarm tu AI Box.
+- `POST /api/v1/webhook/:token`: alias callback cu cho domain `api-aibox.genieplatform.cloud`.
 - `GET /api/alarms`: lay danh sach alarm, co filter `q`, `taskSession`, `summary`, `description`, `mediaName`, `from`, `to`.
 - `GET /api/alarms/stream`: realtime stream cho dashboard bang Server-Sent Events.
 - `GET /api/alarms/:id`: xem chi tiet mot alarm.

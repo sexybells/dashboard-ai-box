@@ -25,7 +25,8 @@ export async function handleAiBoxWebhookRequest(request: NextRequest) {
       publishAlarmEvent({
         type: "alarm-created",
         id: result.id,
-        occurredAt: new Date().toISOString()
+        occurredAt: new Date().toISOString(),
+        alarm: result.alarm
       });
     }
     return NextResponse.json(result, { status: result.duplicate ? 200 : 201 });

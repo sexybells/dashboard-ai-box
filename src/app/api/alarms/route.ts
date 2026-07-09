@@ -1,5 +1,6 @@
 import { connectMongo } from "@/lib/mongodb";
 import { AlarmModel, type AlarmDocument } from "@/models/alarm";
+import { serializeAlarmListItem } from "@/services/alarm-serializer";
 import type { QueryFilter } from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -13,31 +14,6 @@ function parsePositiveInt(value: string | null, fallback: number, max: number): 
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1) return fallback;
   return Math.min(parsed, max);
-}
-
-function serializeAlarm(alarm: AlarmDocument & { _id: unknown }) {
-  return {
-    id: String(alarm._id),
-    dedupeKey: alarm.dedupeKey,
-    alarmId: alarm.alarmId,
-    uniqueId: alarm.uniqueId,
-    taskSession: alarm.taskSession,
-    taskDesc: alarm.taskDesc,
-    summary: alarm.summary,
-    description: alarm.description,
-    time: alarm.time?.toISOString(),
-    timeText: alarm.timeText,
-    timestamp: alarm.timestamp,
-    boardId: alarm.boardId,
-    boardIp: alarm.boardIp,
-    mediaName: alarm.mediaName,
-    mediaUrl: alarm.mediaUrl,
-    imageKind: alarm.imageKind,
-    imageUrl: alarm.imageUrl,
-    imageOriginal: alarm.imageOriginal,
-    createdAt: alarm.createdAt?.toISOString(),
-    updatedAt: alarm.updatedAt?.toISOString()
-  };
 }
 
 export async function GET(request: NextRequest) {
@@ -87,7 +63,7 @@ export async function GET(request: NextRequest) {
   ]);
 
   return NextResponse.json({
-    data: items.map((item) => serializeAlarm(item as AlarmDocument & { _id: unknown })),
+    data: items.map((item) => serializeAlarmListItem(item as AlarmDocument & { _id: unknown })),
     page,
     limit,
     total,

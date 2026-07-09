@@ -1,7 +1,10 @@
+import type { AlarmListItem } from "./alarm-client";
+
 export interface AlarmRealtimeEvent {
   type: "alarm-created";
   id: string;
   occurredAt: string;
+  alarm?: AlarmListItem;
 }
 
 export type AlarmEventSubscriber = (event: AlarmRealtimeEvent) => void;

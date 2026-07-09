@@ -3,6 +3,8 @@ import { persistAlarmImage, type ImagePersistenceResult } from "@/lib/aibox/imag
 import { normalizeAiBoxAlarm, type NormalizedAlarmInput } from "@/lib/aibox/normalize";
 import { connectMongo } from "@/lib/mongodb";
 import { AlarmModel } from "@/models/alarm";
+import type { AlarmListItem } from "@/services/alarm-client";
+import { serializeAlarmListItem } from "@/services/alarm-serializer";
 import { WebhookEventModel } from "@/models/webhook-event";
 
 export interface AlarmIngestRepository {
@@ -18,7 +20,7 @@ export interface AlarmIngestRepository {
       imageUrl: string | null;
       imagePath: string | null;
     }
-  ): Promise<{ id: string }>;
+  ): Promise<{ id: string; alarm?: AlarmListItem }>;
 }
 
 export interface AlarmIngestDependencies {
@@ -33,6 +35,7 @@ export interface AlarmIngestResult {
   ok: true;
   duplicate: boolean;
   id: string;
+  alarm?: AlarmListItem;
 }
 
 class MongoAlarmIngestRepository implements AlarmIngestRepository {
@@ -57,10 +60,19 @@ class MongoAlarmIngestRepository implements AlarmIngestRepository {
       imageUrl: string | null;
       imagePath: string | null;
     }
-  ): Promise<{ id: string }> {
+  ): Promise<{ id: string; alarm?: AlarmListItem }> {
     await connectMongo();
     const created = await AlarmModel.create(alarm);
-    return { id: String(created._id) };
+    const serialized = serializeAlarmListItem(
+      created.toObject() as NormalizedAlarmInput & {
+        _id: unknown;
+        imageUrl: string | null;
+        imagePath: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }
+    );
+    return { id: String(created._id), alarm: serialized };
   }
 }
 
@@ -92,17 +104,41 @@ export async function ingestAiBoxWebhook(
   }
 
   const image = await imagePersister(normalized.imageOriginal, normalized.dedupeKey);
-  const created = await repo.createAlarm({
+  const alarmInput = {
     ...normalized,
     imageKind: image.kind,
     imageUrl: image.publicUrl,
     imagePath: image.localPath,
     imageOriginal: image.original ?? normalized.imageOriginal
-  });
+  };
+  const created = await repo.createAlarm(alarmInput);
+  const alarm =
+    created.alarm ??
+    ({
+      id: created.id,
+      dedupeKey: alarmInput.dedupeKey,
+      alarmId: alarmInput.alarmId,
+      uniqueId: alarmInput.uniqueId,
+      taskSession: alarmInput.taskSession,
+      taskDesc: alarmInput.taskDesc,
+      summary: alarmInput.summary,
+      description: alarmInput.description,
+      time: alarmInput.time?.toISOString(),
+      timeText: alarmInput.timeText,
+      timestamp: alarmInput.timestamp,
+      boardId: alarmInput.boardId,
+      boardIp: alarmInput.boardIp,
+      mediaName: alarmInput.mediaName,
+      mediaUrl: alarmInput.mediaUrl,
+      imageKind: alarmInput.imageKind,
+      imageUrl: alarmInput.imageUrl,
+      imageOriginal: alarmInput.imageOriginal
+    } satisfies AlarmListItem);
 
   return {
     ok: true,
     duplicate: false,
-    id: created.id
+    id: created.id,
+    alarm
   };
 }

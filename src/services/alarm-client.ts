@@ -1,17 +1,24 @@
 export interface AlarmListItem {
   id: string;
+  dedupeKey?: string;
+  alarmId?: string;
+  uniqueId?: string;
   taskSession?: string;
   taskDesc?: string;
   summary?: string;
   description?: string;
   time?: string;
   timeText?: string;
+  timestamp?: number;
+  boardId?: string;
   boardIp?: string;
   mediaName?: string;
   mediaUrl?: string;
   imageKind: "base64" | "aibox-path" | "none";
   imageUrl?: string | null;
   imageOriginal?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface AlarmListResponse {

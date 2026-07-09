@@ -41,7 +41,18 @@ describe("ingestAiBoxWebhook", () => {
       }
     );
 
-    expect(result).toEqual({ ok: true, duplicate: false, id: "new-id" });
+    expect(result).toMatchObject({
+      ok: true,
+      duplicate: false,
+      id: "new-id",
+      alarm: {
+        id: "new-id",
+        dedupeKey: "unique:ALARM_123",
+        taskSession: "gate-in",
+        imageKind: "base64",
+        imageUrl: "/api/alarm-images/alarm.jpg"
+      }
+    });
     expect(repo.events).toHaveLength(1);
     expect(repo.created).toHaveLength(1);
     expect(repo.created[0]).toMatchObject({

@@ -201,6 +201,22 @@ select:focus {
   font-size: 18px;
 }
 
+.heading-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.new-alarm-badge {
+  border: 1px solid #9ad6b3;
+  border-radius: 999px;
+  background: #edfdf3;
+  color: var(--success);
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .table-panel {
   padding: 0;
   overflow: hidden;
@@ -235,6 +251,20 @@ th {
 
 td {
   font-size: 14px;
+}
+
+.new-alarm-row td {
+  animation: new-alarm-highlight 5s ease-out;
+}
+
+@keyframes new-alarm-highlight {
+  0% {
+    background-color: #d1fadf;
+  }
+
+  100% {
+    background-color: transparent;
+  }
 }
 
 td strong,

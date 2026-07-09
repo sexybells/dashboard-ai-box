@@ -2,14 +2,16 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getWebhookUrl } from "@/lib/webhook-url";
+import type { AlarmRealtimeEvent } from "@/services/alarm-events";
 import {
   fetchAlarmList,
   type AlarmFilters,
   type AlarmListItem,
   type AlarmListResponse
 } from "@/services/alarm-client";
+import { mergeRealtimeAlarm } from "@/services/realtime-alarm-list";
 
 type RealtimeStatus = "connecting" | "live" | "offline";
 
@@ -55,11 +57,38 @@ export function AlarmDashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
   const [webhookUrl, setWebhookUrl] = useState(getWebhookUrl());
+  const [highlightedAlarmIds, setHighlightedAlarmIds] = useState<Set<string>>(() => new Set());
+  const [newAlarmCount, setNewAlarmCount] = useState(0);
+  const dataRef = useRef<AlarmListResponse>(emptyResponse);
+  const highlightTimersRef = useRef<number[]>([]);
+
+  const clearHighlightTimers = useCallback(() => {
+    for (const timer of highlightTimersRef.current) {
+      window.clearTimeout(timer);
+    }
+    highlightTimersRef.current = [];
+  }, []);
+
+  const markAlarmHighlighted = useCallback((id: string) => {
+    setHighlightedAlarmIds((current) => new Set(current).add(id));
+    const timer = window.setTimeout(() => {
+      setHighlightedAlarmIds((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
+    }, 5000);
+    highlightTimersRef.current.push(timer);
+  }, []);
 
   const loadAlarms = useCallback(async () => {
     try {
       const result = await fetchAlarmList(filters);
+      dataRef.current = result;
       setData(result);
+      setNewAlarmCount(0);
+      clearHighlightTimers();
+      setHighlightedAlarmIds(new Set());
       setLastUpdated(new Date());
       setError(null);
     } catch (requestError) {
@@ -67,7 +96,7 @@ export function AlarmDashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [filters]);
+  }, [clearHighlightTimers, filters]);
 
   useEffect(() => {
     const initialTimer = window.setTimeout(() => {
@@ -93,9 +122,38 @@ export function AlarmDashboard() {
       setRealtimeStatus("live");
     });
 
-    source.addEventListener("alarm-created", () => {
+    source.addEventListener("alarm-created", (event) => {
       setRealtimeStatus("live");
-      void loadAlarms();
+      const message = event as MessageEvent<string>;
+      let payload: AlarmRealtimeEvent | null = null;
+
+      try {
+        payload = JSON.parse(message.data) as AlarmRealtimeEvent;
+      } catch {
+        void loadAlarms();
+        return;
+      }
+
+      if (!payload.alarm) {
+        void loadAlarms();
+        return;
+      }
+
+      const hadAlarm = dataRef.current.data.some((alarm) => alarm.id === payload?.alarm?.id);
+      const result = mergeRealtimeAlarm(dataRef.current, payload.alarm, filters, dataRef.current.limit);
+      dataRef.current = result.data;
+      setData(result.data);
+      setIsLoading(false);
+      setLastUpdated(new Date());
+      setError(null);
+
+      if (!hadAlarm) {
+        setNewAlarmCount((current) => current + 1);
+      }
+
+      if (result.highlightedId) {
+        markAlarmHighlighted(result.highlightedId);
+      }
     });
 
     source.onerror = () => {
@@ -106,7 +164,13 @@ export function AlarmDashboard() {
       window.clearTimeout(webhookUrlTimer);
       source.close();
     };
-  }, [loadAlarms]);
+  }, [filters, loadAlarms, markAlarmHighlighted]);
+
+  useEffect(() => {
+    return () => {
+      clearHighlightTimers();
+    };
+  }, [clearHighlightTimers]);
 
   const taskSessions = uniqueValues(data.data, "taskSession");
   const summaries = uniqueValues(data.data, "summary");
@@ -226,7 +290,14 @@ export function AlarmDashboard() {
       <section className="panel table-panel">
         <div className="section-heading">
           <h2>Recent alarms</h2>
-          {isLoading ? <span>Loading...</span> : <span>{data.data.length} rows</span>}
+          <div className="heading-meta">
+            {newAlarmCount > 0 ? (
+              <span className="new-alarm-badge">
+                {newAlarmCount.toLocaleString("vi-VN")} new alarm
+              </span>
+            ) : null}
+            {isLoading ? <span>Loading...</span> : <span>{data.data.length} rows</span>}
+          </div>
         </div>
 
         {error ? <div className="alert">{error}</div> : null}
@@ -245,7 +316,7 @@ export function AlarmDashboard() {
             </thead>
             <tbody>
               {data.data.map((alarm) => (
-                <tr key={alarm.id}>
+                <tr key={alarm.id} className={highlightedAlarmIds.has(alarm.id) ? "new-alarm-row" : undefined}>
                   <td>
                     <div className="thumb">
                       {alarm.imageUrl ? (

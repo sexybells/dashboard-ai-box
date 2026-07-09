@@ -27,11 +27,11 @@ export default async function AlarmDetailPage({ params }: AlarmDetailPageProps) 
     <main className="page-shell">
       <div className="page-header">
         <div>
-          <p className="eyebrow">Alarm detail</p>
-          <h1>{alarm.taskSession || alarm.summary || "AI Box Alarm"}</h1>
+          <p className="eyebrow">Chi tiết cảnh báo</p>
+          <h1>{alarm.taskSession || alarm.summary || "Cảnh báo AI Box"}</h1>
         </div>
         <Link className="button secondary" href="/">
-          Back
+          Quay lại
         </Link>
       </div>
       <AlarmDetail

@@ -3,6 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  formatAlarmDate,
+  getAlarmListEmptyMessage,
+  getRealtimeStatusLabel,
+  type RealtimeStatus
+} from "@/components/alarm-display";
 import { getWebhookUrl } from "@/lib/webhook-url";
 import type { AlarmRealtimeEvent } from "@/services/alarm-events";
 import {
@@ -13,8 +19,6 @@ import {
 } from "@/services/alarm-client";
 import { mergeRealtimeAlarm } from "@/services/realtime-alarm-list";
 
-type RealtimeStatus = "connecting" | "live" | "offline";
-
 const emptyResponse: AlarmListResponse = {
   data: [],
   total: 0,
@@ -23,20 +27,6 @@ const emptyResponse: AlarmListResponse = {
   limit: 20,
   totalPages: 0
 };
-
-function formatDate(value?: string): string {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  }).format(date);
-}
 
 function uniqueValues(items: AlarmListItem[], key: keyof AlarmListItem): string[] {
   return Array.from(
@@ -175,23 +165,28 @@ export function AlarmDashboard() {
   const taskSessions = uniqueValues(data.data, "taskSession");
   const summaries = uniqueValues(data.data, "summary");
   const cameras = uniqueValues(data.data, "mediaName");
-  const realtimeLabel = realtimeStatus === "live" ? "Live" : realtimeStatus === "offline" ? "Offline" : "Connecting";
+  const realtimeLabel = getRealtimeStatusLabel(realtimeStatus);
+  const hasActiveFilters = Boolean(filters.q || filters.taskSession || filters.summary || filters.mediaName);
+  const rowCountLabel = `${data.data.length.toLocaleString("vi-VN")} dòng`;
 
   return (
     <main className="page-shell">
-      <div className="page-header">
+      <div className="page-header dashboard-header">
         <div>
-          <p className="eyebrow">Local LAN</p>
-          <h1>AI Box Alarm Dashboard</h1>
+          <p className="eyebrow">Giám sát thời gian thực</p>
+          <h1>Bảng điều khiển cảnh báo AI Box</h1>
         </div>
-        <button className="button" type="button" onClick={() => void loadAlarms()}>
-          Refresh
-        </button>
+        <div className="header-actions">
+          <span className={`status-pill ${realtimeStatus}`}>{realtimeLabel}</span>
+          <button className="button" type="button" onClick={() => void loadAlarms()}>
+            Làm mới
+          </button>
+        </div>
       </div>
 
       <section className="webhook-banner">
         <div>
-          <span>Alarm Listener URL</span>
+          <span>URL nhận cảnh báo</span>
           <strong>{webhookUrl}</strong>
         </div>
         <button
@@ -199,29 +194,29 @@ export function AlarmDashboard() {
           type="button"
           onClick={() => navigator.clipboard.writeText(webhookUrl)}
         >
-          Copy
+          Sao chép
         </button>
       </section>
 
       <section className="metric-grid">
         <div className="metric">
-          <span>Total alarms</span>
+          <span>Tổng cảnh báo</span>
           <strong>{data.allTotal.toLocaleString("vi-VN")}</strong>
         </div>
         <div className="metric">
-          <span>Filtered</span>
+          <span>Theo bộ lọc</span>
           <strong>{data.total.toLocaleString("vi-VN")}</strong>
         </div>
         <div className="metric">
-          <span>Visible</span>
+          <span>Đang hiển thị</span>
           <strong>{data.data.length.toLocaleString("vi-VN")}</strong>
         </div>
         <div className="metric">
-          <span>Last updated</span>
-          <strong>{lastUpdated ? formatDate(lastUpdated.toISOString()) : "-"}</strong>
+          <span>Cập nhật lần cuối</span>
+          <strong>{lastUpdated ? formatAlarmDate(lastUpdated.toISOString()) : "-"}</strong>
         </div>
         <div className="metric">
-          <span>Realtime</span>
+          <span>Kết nối realtime</span>
           <strong className={`status-text ${realtimeStatus}`}>{realtimeLabel}</strong>
         </div>
       </section>
@@ -229,22 +224,22 @@ export function AlarmDashboard() {
       <section className="panel">
         <div className="filter-grid">
           <label>
-            Search
+            Tìm kiếm
             <input
               value={filters.q}
               onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))}
-              placeholder="AlarmId, task, camera..."
+              placeholder="Mã cảnh báo, tác vụ, camera..."
             />
           </label>
           <label>
-            Task
+            Tác vụ
             <select
               value={filters.taskSession}
               onChange={(event) =>
                 setFilters((current) => ({ ...current, taskSession: event.target.value }))
               }
             >
-              <option value="">All tasks</option>
+              <option value="">Tất cả tác vụ</option>
               {taskSessions.map((value) => (
                 <option key={value} value={value}>
                   {value}
@@ -253,14 +248,14 @@ export function AlarmDashboard() {
             </select>
           </label>
           <label>
-            Summary
+            Loại cảnh báo
             <select
               value={filters.summary}
               onChange={(event) =>
                 setFilters((current) => ({ ...current, summary: event.target.value }))
               }
             >
-              <option value="">All summaries</option>
+              <option value="">Tất cả loại cảnh báo</option>
               {summaries.map((value) => (
                 <option key={value} value={value}>
                   {value}
@@ -276,7 +271,7 @@ export function AlarmDashboard() {
                 setFilters((current) => ({ ...current, mediaName: event.target.value }))
               }
             >
-              <option value="">All cameras</option>
+              <option value="">Tất cả camera</option>
               {cameras.map((value) => (
                 <option key={value} value={value}>
                   {value}
@@ -289,14 +284,14 @@ export function AlarmDashboard() {
 
       <section className="panel table-panel">
         <div className="section-heading">
-          <h2>Recent alarms</h2>
+          <h2>Cảnh báo gần đây</h2>
           <div className="heading-meta">
             {newAlarmCount > 0 ? (
               <span className="new-alarm-badge">
-                {newAlarmCount.toLocaleString("vi-VN")} new alarm
+                {newAlarmCount.toLocaleString("vi-VN")} cảnh báo mới
               </span>
             ) : null}
-            {isLoading ? <span>Loading...</span> : <span>{data.data.length} rows</span>}
+            {isLoading ? <span>Đang tải...</span> : <span>{rowCountLabel}</span>}
           </div>
         </div>
 
@@ -306,11 +301,11 @@ export function AlarmDashboard() {
           <table>
             <thead>
               <tr>
-                <th>Image</th>
-                <th>Task</th>
+                <th>Ảnh</th>
+                <th>Tác vụ</th>
                 <th>Camera</th>
-                <th>Alarm</th>
-                <th>Time</th>
+                <th>Cảnh báo</th>
+                <th>Thời gian</th>
                 <th />
               </tr>
             </thead>
@@ -322,7 +317,7 @@ export function AlarmDashboard() {
                       {alarm.imageUrl ? (
                         <Image
                           src={alarm.imageUrl}
-                          alt={alarm.summary || "AI Box alarm"}
+                          alt={alarm.summary || "Cảnh báo AI Box"}
                           width={96}
                           height={64}
                           unoptimized
@@ -344,10 +339,10 @@ export function AlarmDashboard() {
                     <strong>{alarm.summary || "-"}</strong>
                     <small>{alarm.description || ""}</small>
                   </td>
-                  <td>{formatDate(alarm.time || alarm.timeText)}</td>
+                  <td>{formatAlarmDate(alarm.time || alarm.timeText)}</td>
                   <td>
                     <Link className="text-link" href={`/alarms/${alarm.id}`}>
-                      Detail
+                      Chi tiết
                     </Link>
                   </td>
                 </tr>
@@ -355,7 +350,7 @@ export function AlarmDashboard() {
               {!isLoading && data.data.length === 0 ? (
                 <tr>
                   <td colSpan={6}>
-                    <div className="empty-state">No alarms yet. Trigger an AI Box task callback.</div>
+                    <div className="empty-state">{getAlarmListEmptyMessage(hasActiveFilters)}</div>
                   </td>
                 </tr>
               ) : null}

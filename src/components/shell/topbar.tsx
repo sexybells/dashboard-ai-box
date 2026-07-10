@@ -1,9 +1,11 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { Bell, Menu, Search } from "lucide-react";
+import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { Bell, LogOut, Menu, Search } from "lucide-react";
 import { NAV_GROUPS } from "@/components/shell/nav-config";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
+import { logout } from "@/services/auth-client";
 
 function currentTitle(pathname: string): string {
   for (const group of NAV_GROUPS) {
@@ -22,6 +24,19 @@ interface TopbarProps {
 
 export function Topbar({ onOpenMenu }: TopbarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  async function handleLogout() {
+    setIsSigningOut(true);
+    try {
+      await logout();
+      router.replace("/login");
+      router.refresh();
+    } finally {
+      setIsSigningOut(false);
+    }
+  }
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur sm:px-6">
@@ -55,6 +70,16 @@ export function Topbar({ onOpenMenu }: TopbarProps) {
         </button>
 
         <ThemeToggle />
+
+        <button
+          type="button"
+          onClick={() => void handleLogout()}
+          disabled={isSigningOut}
+          aria-label="Đăng xuất"
+          className="inline-flex size-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <LogOut className="size-4.5" />
+        </button>
 
         <span
           aria-hidden

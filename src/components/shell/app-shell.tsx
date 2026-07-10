@@ -1,13 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
 
 // App shell: fixed sidebar + sticky topbar + scrollable content. Holds the
 // mobile drawer open state.
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  if (pathname === "/login") {
+    return <main className="min-h-dvh bg-background">{children}</main>;
+  }
 
   return (
     <div className="flex min-h-dvh bg-background">

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Copy, RefreshCw } from "lucide-react";
 import {
   formatAlarmDate,
   formatAlarmTime,
@@ -10,6 +11,9 @@ import {
   getRealtimeStatusLabel,
   type RealtimeStatus
 } from "@/components/alarm-display";
+import { Card } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/stat-card";
+import { StatusPill } from "@/components/ui/status-pill";
 import { getWebhookUrl } from "@/lib/webhook-url";
 import type { AlarmRealtimeEvent } from "@/services/alarm-events";
 import {
@@ -28,6 +32,10 @@ const emptyResponse: AlarmListResponse = {
   limit: 20,
   totalPages: 0
 };
+
+const inputClass =
+  "h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring";
+const labelClass = "grid gap-1.5 text-xs font-medium text-muted-foreground";
 
 function uniqueValues(items: AlarmListItem[], key: keyof AlarmListItem): string[] {
   return Array.from(
@@ -166,79 +174,72 @@ export function AlarmDashboard() {
   const taskSessions = uniqueValues(data.data, "taskSession");
   const summaries = uniqueValues(data.data, "summary");
   const cameras = uniqueValues(data.data, "mediaName");
-  const realtimeLabel = getRealtimeStatusLabel(realtimeStatus);
   const hasActiveFilters = Boolean(filters.q || filters.taskSession || filters.summary || filters.mediaName);
   const rowCountLabel = `${data.data.length.toLocaleString("vi-VN")} dòng`;
 
   return (
-    <main className="page-shell">
-      <div className="page-header dashboard-header">
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="eyebrow">Giám sát thời gian thực</p>
-          <h1>Bảng điều khiển cảnh báo AI Box</h1>
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand">Giám sát thời gian thực</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight">Bảng điều khiển cảnh báo AI Box</h2>
         </div>
-        <div className="header-actions">
-          <span className={`status-pill ${realtimeStatus}`}>{realtimeLabel}</span>
-          <button className="button" type="button" onClick={() => void loadAlarms()}>
+        <div className="flex items-center gap-2.5">
+          <StatusPill status={realtimeStatus} />
+          <button
+            type="button"
+            onClick={() => void loadAlarms()}
+            className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            <RefreshCw className="size-4" />
             Làm mới
           </button>
         </div>
       </div>
 
-      <section className="webhook-banner">
-        <div>
-          <span>URL nhận cảnh báo</span>
-          <strong>{webhookUrl}</strong>
+      <Card className="flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-brand p-4">
+        <div className="min-w-0">
+          <p className="text-xs text-muted-foreground">URL nhận cảnh báo</p>
+          <p className="mt-1 break-all font-mono text-sm">{webhookUrl}</p>
         </div>
         <button
-          className="button secondary"
           type="button"
           onClick={() => navigator.clipboard.writeText(webhookUrl)}
+          className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
         >
+          <Copy className="size-4" />
           Sao chép
         </button>
-      </section>
+      </Card>
 
-      <section className="metric-grid">
-        <div className="metric">
-          <span>Tổng cảnh báo</span>
-          <strong>{data.allTotal.toLocaleString("vi-VN")}</strong>
-        </div>
-        <div className="metric">
-          <span>Theo bộ lọc</span>
-          <strong>{data.total.toLocaleString("vi-VN")}</strong>
-        </div>
-        <div className="metric">
-          <span>Đang hiển thị</span>
-          <strong>{data.data.length.toLocaleString("vi-VN")}</strong>
-        </div>
-        <div className="metric">
-          <span>Cập nhật lần cuối</span>
-          <strong>{lastUpdated ? formatAlarmDate(lastUpdated.toISOString()) : "-"}</strong>
-        </div>
-        <div className="metric">
-          <span>Kết nối realtime</span>
-          <strong className={`status-text ${realtimeStatus}`}>{realtimeLabel}</strong>
-        </div>
-      </section>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Tổng cảnh báo" value={data.allTotal.toLocaleString("vi-VN")} />
+        <StatCard label="Theo bộ lọc" value={data.total.toLocaleString("vi-VN")} />
+        <StatCard label="Đang hiển thị" value={data.data.length.toLocaleString("vi-VN")} />
+        <StatCard
+          label="Cập nhật lần cuối"
+          value={lastUpdated ? formatAlarmDate(lastUpdated.toISOString()) : "-"}
+          hint={getRealtimeStatusLabel(realtimeStatus)}
+        />
+      </div>
 
-      <section className="panel">
-        <div className="filter-grid">
-          <label>
+      <Card className="p-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <label className={labelClass}>
             Tìm kiếm
             <input
+              className={inputClass}
               value={filters.q}
               onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))}
               placeholder="Mã cảnh báo, tác vụ, camera..."
             />
           </label>
-          <label>
+          <label className={labelClass}>
             Tác vụ
             <select
+              className={inputClass}
               value={filters.taskSession}
-              onChange={(event) =>
-                setFilters((current) => ({ ...current, taskSession: event.target.value }))
-              }
+              onChange={(event) => setFilters((current) => ({ ...current, taskSession: event.target.value }))}
             >
               <option value="">Tất cả tác vụ</option>
               {taskSessions.map((value) => (
@@ -248,13 +249,12 @@ export function AlarmDashboard() {
               ))}
             </select>
           </label>
-          <label>
+          <label className={labelClass}>
             Loại cảnh báo
             <select
+              className={inputClass}
               value={filters.summary}
-              onChange={(event) =>
-                setFilters((current) => ({ ...current, summary: event.target.value }))
-              }
+              onChange={(event) => setFilters((current) => ({ ...current, summary: event.target.value }))}
             >
               <option value="">Tất cả loại cảnh báo</option>
               {summaries.map((value) => (
@@ -264,13 +264,12 @@ export function AlarmDashboard() {
               ))}
             </select>
           </label>
-          <label>
+          <label className={labelClass}>
             Camera
             <select
+              className={inputClass}
               value={filters.mediaName}
-              onChange={(event) =>
-                setFilters((current) => ({ ...current, mediaName: event.target.value }))
-              }
+              onChange={(event) => setFilters((current) => ({ ...current, mediaName: event.target.value }))}
             >
               <option value="">Tất cả camera</option>
               {cameras.map((value) => (
@@ -281,14 +280,14 @@ export function AlarmDashboard() {
             </select>
           </label>
         </div>
-      </section>
+      </Card>
 
-      <section className="panel table-panel">
-        <div className="section-heading">
-          <h2>Cảnh báo gần đây</h2>
-          <div className="heading-meta">
+      <Card className="overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+          <h3 className="text-sm font-semibold tracking-tight">Cảnh báo gần đây</h3>
+          <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
             {newAlarmCount > 0 ? (
-              <span className="new-alarm-badge">
+              <span className="rounded-full border border-success/30 bg-success/10 px-2 py-0.5 font-semibold text-success">
                 {newAlarmCount.toLocaleString("vi-VN")} cảnh báo mới
               </span>
             ) : null}
@@ -296,25 +295,32 @@ export function AlarmDashboard() {
           </div>
         </div>
 
-        {error ? <div className="alert">{error}</div> : null}
+        {error ? (
+          <div className="mx-5 mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </div>
+        ) : null}
 
-        <div className="table-wrap">
-          <table>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[860px] border-collapse text-sm">
             <thead>
-              <tr>
-                <th>Ảnh</th>
-                <th>Tác vụ</th>
-                <th>Camera</th>
-                <th>Cảnh báo</th>
-                <th>Thời gian</th>
-                <th />
+              <tr className="border-b border-border bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <th className="px-4 py-3">Ảnh</th>
+                <th className="px-4 py-3">Tác vụ</th>
+                <th className="px-4 py-3">Camera</th>
+                <th className="px-4 py-3">Cảnh báo</th>
+                <th className="px-4 py-3">Thời gian</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {data.data.map((alarm) => (
-                <tr key={alarm.id} className={highlightedAlarmIds.has(alarm.id) ? "new-alarm-row" : undefined}>
-                  <td>
-                    <div className="thumb">
+                <tr
+                  key={alarm.id}
+                  className={cnRow(highlightedAlarmIds.has(alarm.id))}
+                >
+                  <td className="px-4 py-3 align-middle">
+                    <div className="flex size-16 items-center justify-center overflow-hidden rounded-md border border-border bg-muted text-[11px] text-muted-foreground">
                       {alarm.imageUrl ? (
                         <Image
                           src={alarm.imageUrl}
@@ -322,27 +328,34 @@ export function AlarmDashboard() {
                           width={96}
                           height={64}
                           unoptimized
+                          className="size-full object-cover"
                         />
                       ) : (
                         <span>{alarm.imageKind}</span>
                       )}
                     </div>
                   </td>
-                  <td>
-                    <strong>{alarm.taskSession || "-"}</strong>
-                    <small>{alarm.taskDesc || alarm.boardIp || ""}</small>
+                  <td className="px-4 py-3 align-middle">
+                    <span className="block font-medium break-words">{alarm.taskSession || "-"}</span>
+                    <span className="mt-0.5 block max-w-[280px] truncate text-xs text-muted-foreground">
+                      {alarm.taskDesc || alarm.boardIp || ""}
+                    </span>
                   </td>
-                  <td>
-                    <strong>{alarm.mediaName || "-"}</strong>
-                    <small>{alarm.mediaUrl || ""}</small>
+                  <td className="px-4 py-3 align-middle">
+                    <span className="block font-medium break-words">{alarm.mediaName || "-"}</span>
+                    <span className="mt-0.5 block max-w-[280px] truncate text-xs text-muted-foreground">
+                      {alarm.mediaUrl || ""}
+                    </span>
                   </td>
-                  <td>
-                    <strong>{alarm.summary || "-"}</strong>
-                    <small>{alarm.description || ""}</small>
+                  <td className="px-4 py-3 align-middle">
+                    <span className="block font-medium break-words">{alarm.summary || "-"}</span>
+                    <span className="mt-0.5 block max-w-[280px] truncate text-xs text-muted-foreground">
+                      {alarm.description || ""}
+                    </span>
                   </td>
-                  <td>{formatAlarmTime(alarm.time, alarm.timeText)}</td>
-                  <td>
-                    <Link className="text-link" href={`/alarms/${alarm.id}`}>
+                  <td className="px-4 py-3 align-middle whitespace-nowrap">{formatAlarmTime(alarm.time, alarm.timeText)}</td>
+                  <td className="px-4 py-3 align-middle">
+                    <Link className="font-medium text-brand hover:underline" href={`/alarms/${alarm.id}`}>
                       Chi tiết
                     </Link>
                   </td>
@@ -351,14 +364,23 @@ export function AlarmDashboard() {
               {!isLoading && data.data.length === 0 ? (
                 <tr>
                   <td colSpan={6}>
-                    <div className="empty-state">{getAlarmListEmptyMessage(hasActiveFilters)}</div>
+                    <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                      {getAlarmListEmptyMessage(hasActiveFilters)}
+                    </div>
                   </td>
                 </tr>
               ) : null}
             </tbody>
           </table>
         </div>
-      </section>
-    </main>
+      </Card>
+    </div>
   );
+}
+
+// Row style with a fade highlight for newly-arrived alarms.
+function cnRow(highlighted: boolean): string {
+  return highlighted
+    ? "border-b border-border bg-success/10 transition-colors"
+    : "border-b border-border transition-colors hover:bg-muted/40";
 }

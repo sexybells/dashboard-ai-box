@@ -1,5 +1,5 @@
-import { AlarmDashboard } from "@/components/alarm-dashboard";
+import { OverviewDashboard } from "@/components/overview-dashboard";
 
 export default function HomePage() {
-  return <AlarmDashboard />;
+  return <OverviewDashboard />;
 }

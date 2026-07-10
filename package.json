@@ -16,18 +16,24 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "apexcharts": "^5.16.0",
+    "geist": "^1.7.2",
+    "lucide-react": "^1.24.0",
     "mongoose": "^9.7.4",
     "next": "^16.2.10",
     "react": "^19.2.7",
+    "react-apexcharts": "^2.1.1",
     "react-dom": "^19.2.7",
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.2",
     "@types/node": "^25.0.0",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.2",
     "eslint-config-next": "^16.2.10",
+    "tailwindcss": "^4.3.2",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   }

@@ -1,3 +1,4 @@
+import { ArrowLeft } from "lucide-react";
 import { AlarmDetail } from "@/components/alarm-detail";
 import { connectMongo } from "@/lib/mongodb";
 import { AlarmModel } from "@/models/alarm";
@@ -24,13 +25,19 @@ export default async function AlarmDetailPage({ params }: AlarmDetailPageProps) 
   }
 
   return (
-    <main className="page-shell">
-      <div className="page-header">
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="eyebrow">Chi tiết cảnh báo</p>
-          <h1>{alarm.taskSession || alarm.summary || "Cảnh báo AI Box"}</h1>
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand">Chi tiết cảnh báo</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+            {alarm.taskSession || alarm.summary || "Cảnh báo AI Box"}
+          </h2>
         </div>
-        <Link className="button secondary" href="/">
+        <Link
+          href="/alarms"
+          className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-card px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+        >
+          <ArrowLeft className="size-4" />
           Quay lại
         </Link>
       </div>
@@ -41,6 +48,6 @@ export default async function AlarmDetailPage({ params }: AlarmDetailPageProps) 
           _id: String(alarm._id)
         }}
       />
-    </main>
+    </div>
   );
 }

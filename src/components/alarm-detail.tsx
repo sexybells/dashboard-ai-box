@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { formatUnknown } from "@/components/alarm-display";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface AlarmDetailProps {
   alarm: {
@@ -34,11 +35,13 @@ interface AlarmDetailProps {
   };
 }
 
-function row(label: string, value?: unknown) {
+function Row({ label, value }: { label: string; value?: unknown }) {
   return (
-    <div className="detail-row">
-      <span>{label}</span>
-      <strong>{typeof value === "string" || typeof value === "number" ? formatUnknown(value) : "-"}</strong>
+    <div className="grid grid-cols-[128px_minmax(0,1fr)] gap-3 border-b border-border pb-2.5 last:border-0 last:pb-0">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <strong className="break-words text-sm font-medium">
+        {typeof value === "string" || typeof value === "number" ? formatUnknown(value) : "-"}
+      </strong>
     </div>
   );
 }
@@ -47,69 +50,83 @@ export function AlarmDetail({ alarm }: AlarmDetailProps) {
   const properties = alarm.raw?.Result?.Properties || [];
 
   return (
-    <div className="detail-grid">
-      <section className="panel media-panel">
-        <div className="section-heading">
-          <h2>Ảnh cảnh báo</h2>
-        </div>
-        <div className="image-preview">
-          {alarm.imageUrl ? (
-            <Image
-              src={alarm.imageUrl}
-              alt={alarm.summary || "Cảnh báo AI Box"}
-              width={1000}
-              height={640}
-              unoptimized
-            />
-          ) : (
-            <div className="empty-state">
-              Không có ảnh cục bộ. Nguồn: {alarm.imageOriginal || alarm.imageKind || "không có"}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="panel">
-        <div className="section-heading">
-          <h2>Thông tin cảnh báo</h2>
-        </div>
-        <div className="detail-list">
-          {row("Tác vụ", alarm.taskSession)}
-          {row("Tóm tắt", alarm.summary)}
-          {row("Mô tả", alarm.description)}
-          {row("Camera", alarm.mediaName)}
-          {row("IP thiết bị", alarm.boardIp)}
-          {row("Mã cảnh báo", alarm.alarmId)}
-          {row("Mã định danh", alarm.uniqueId)}
-          {row("Thời gian", alarm.timeText || alarm.time)}
-        </div>
-      </section>
-
-      <section className="panel properties-panel">
-        <div className="section-heading">
-          <h2>Thuộc tính kết quả</h2>
-          <span>{properties.length.toLocaleString("vi-VN")} mục</span>
-        </div>
-        {properties.length > 0 ? (
-          <div className="property-list">
-            {properties.map((property, index) => (
-              <div className="property-item" key={`${property.property || property.desc}-${index}`}>
-                <span>{property.desc || property.property || "Thuộc tính"}</span>
-                <strong>{property.display || String(property.value ?? "-")}</strong>
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.8fr)]">
+      <Card>
+        <CardHeader>
+          <CardTitle>Ảnh cảnh báo</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid min-h-[420px] place-items-center overflow-auto rounded-lg border border-dashed border-border bg-muted">
+            {alarm.imageUrl ? (
+              <Image
+                src={alarm.imageUrl}
+                alt={alarm.summary || "Cảnh báo AI Box"}
+                width={1000}
+                height={640}
+                unoptimized
+                className="h-auto max-h-[70vh] w-full object-contain"
+              />
+            ) : (
+              <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                Không có ảnh cục bộ. Nguồn: {alarm.imageOriginal || alarm.imageKind || "không có"}
               </div>
-            ))}
+            )}
           </div>
-        ) : (
-          <div className="empty-state">Payload không có Result.Properties.</div>
-        )}
-      </section>
+        </CardContent>
+      </Card>
 
-      <section className="panel raw-panel">
-        <div className="section-heading">
-          <h2>Dữ liệu gốc JSON</h2>
-        </div>
-        <pre>{JSON.stringify(alarm.raw || alarm, null, 2)}</pre>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>Thông tin cảnh báo</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-2.5">
+          <Row label="Tác vụ" value={alarm.taskSession} />
+          <Row label="Tóm tắt" value={alarm.summary} />
+          <Row label="Mô tả" value={alarm.description} />
+          <Row label="Camera" value={alarm.mediaName} />
+          <Row label="IP thiết bị" value={alarm.boardIp} />
+          <Row label="Mã cảnh báo" value={alarm.alarmId} />
+          <Row label="Mã định danh" value={alarm.uniqueId} />
+          <Row label="Thời gian" value={alarm.timeText || alarm.time} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Thuộc tính kết quả</CardTitle>
+          <span className="text-xs text-muted-foreground">{properties.length.toLocaleString("vi-VN")} mục</span>
+        </CardHeader>
+        <CardContent>
+          {properties.length > 0 ? (
+            <div className="grid gap-2.5">
+              {properties.map((property, index) => (
+                <div
+                  key={`${property.property || property.desc}-${index}`}
+                  className="grid grid-cols-[128px_minmax(0,1fr)] gap-3 border-b border-border pb-2.5 last:border-0 last:pb-0"
+                >
+                  <span className="text-sm text-muted-foreground">{property.desc || property.property || "Thuộc tính"}</span>
+                  <strong className="break-words text-sm font-medium">
+                    {property.display || String(property.value ?? "-")}
+                  </strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-sm text-muted-foreground">Payload không có Result.Properties.</div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="lg:col-span-2">
+        <CardHeader>
+          <CardTitle>Dữ liệu gốc JSON</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <pre className="max-h-[560px] overflow-auto rounded-lg bg-neutral-900 p-4 text-xs leading-relaxed text-neutral-100">
+            {JSON.stringify(alarm.raw || alarm, null, 2)}
+          </pre>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
   type RealtimeStatus
 } from "@/components/alarm-display";
 import { Card } from "@/components/ui/card";
+import { LoadingState } from "@/components/ui/loading-state";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { getWebhookUrl } from "@/lib/webhook-url";
@@ -176,6 +177,7 @@ export function AlarmDashboard() {
   const cameras = uniqueValues(data.data, "mediaName");
   const hasActiveFilters = Boolean(filters.q || filters.taskSession || filters.summary || filters.mediaName);
   const rowCountLabel = `${data.data.length.toLocaleString("vi-VN")} dòng`;
+  const isInitialLoading = isLoading && data.data.length === 0;
 
   return (
     <div className="space-y-6">
@@ -301,78 +303,89 @@ export function AlarmDashboard() {
           </div>
         ) : null}
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <th className="px-4 py-3">Ảnh</th>
-                <th className="px-4 py-3">Tác vụ</th>
-                <th className="px-4 py-3">Camera</th>
-                <th className="px-4 py-3">Cảnh báo</th>
-                <th className="px-4 py-3">Thời gian</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {data.data.map((alarm) => (
-                <tr
-                  key={alarm.id}
-                  className={cnRow(highlightedAlarmIds.has(alarm.id))}
-                >
-                  <td className="px-4 py-3 align-middle">
-                    <div className="flex size-16 items-center justify-center overflow-hidden rounded-md border border-border bg-muted text-[11px] text-muted-foreground">
-                      {alarm.imageUrl ? (
-                        <Image
-                          src={alarm.imageUrl}
-                          alt={alarm.summary || "Cảnh báo AI Box"}
-                          width={96}
-                          height={64}
-                          unoptimized
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        <span>{alarm.imageKind}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 align-middle">
-                    <span className="block font-medium break-words">{alarm.taskSession || "-"}</span>
-                    <span className="mt-0.5 block max-w-[280px] truncate text-xs text-muted-foreground">
-                      {alarm.taskDesc || alarm.boardIp || ""}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 align-middle">
-                    <span className="block font-medium break-words">{alarm.mediaName || "-"}</span>
-                    <span className="mt-0.5 block max-w-[280px] truncate text-xs text-muted-foreground">
-                      {alarm.mediaUrl || ""}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 align-middle">
-                    <span className="block font-medium break-words">{alarm.summary || "-"}</span>
-                    <span className="mt-0.5 block max-w-[280px] truncate text-xs text-muted-foreground">
-                      {alarm.description || ""}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 align-middle whitespace-nowrap">{formatAlarmTime(alarm.time, alarm.timeText)}</td>
-                  <td className="px-4 py-3 align-middle">
-                    <Link className="font-medium text-brand hover:underline" href={`/alarms/${alarm.id}`}>
-                      Chi tiết
-                    </Link>
-                  </td>
+        {isInitialLoading ? (
+          <div className="px-5 py-6">
+            <LoadingState
+              label="Đang tải cảnh báo"
+              description="Đang lấy danh sách cảnh báo từ server"
+              rows={5}
+              className="min-h-[300px] border-dashed"
+            />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[860px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <th className="px-4 py-3">Ảnh</th>
+                  <th className="px-4 py-3">Tác vụ</th>
+                  <th className="px-4 py-3">Camera</th>
+                  <th className="px-4 py-3">Cảnh báo</th>
+                  <th className="px-4 py-3">Thời gian</th>
+                  <th className="px-4 py-3" />
                 </tr>
-              ))}
-              {!isLoading && data.data.length === 0 ? (
-                <tr>
-                  <td colSpan={6}>
-                    <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-                      {getAlarmListEmptyMessage(hasActiveFilters)}
-                    </div>
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {data.data.map((alarm) => (
+                  <tr
+                    key={alarm.id}
+                    className={cnRow(highlightedAlarmIds.has(alarm.id))}
+                  >
+                    <td className="px-4 py-3 align-middle">
+                      <div className="flex size-16 items-center justify-center overflow-hidden rounded-md border border-border bg-muted text-[11px] text-muted-foreground">
+                        {alarm.imageUrl ? (
+                          <Image
+                            src={alarm.imageUrl}
+                            alt={alarm.summary || "Cảnh báo AI Box"}
+                            width={96}
+                            height={64}
+                            unoptimized
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          <span>{alarm.imageKind}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 align-middle">
+                      <span className="block font-medium break-words">{alarm.taskSession || "-"}</span>
+                      <span className="mt-0.5 block max-w-[280px] truncate text-xs text-muted-foreground">
+                        {alarm.taskDesc || alarm.boardIp || ""}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 align-middle">
+                      <span className="block font-medium break-words">{alarm.mediaName || "-"}</span>
+                      <span className="mt-0.5 block max-w-[280px] truncate text-xs text-muted-foreground">
+                        {alarm.mediaUrl || ""}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 align-middle">
+                      <span className="block font-medium break-words">{alarm.summary || "-"}</span>
+                      <span className="mt-0.5 block max-w-[280px] truncate text-xs text-muted-foreground">
+                        {alarm.description || ""}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 align-middle whitespace-nowrap">{formatAlarmTime(alarm.time, alarm.timeText)}</td>
+                    <td className="px-4 py-3 align-middle">
+                      <Link className="font-medium text-brand hover:underline" href={`/alarms/${alarm.id}`}>
+                        Chi tiết
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+                {!isLoading && data.data.length === 0 ? (
+                  <tr>
+                    <td colSpan={6}>
+                      <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                        {getAlarmListEmptyMessage(hasActiveFilters)}
+                      </div>
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );

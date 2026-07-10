@@ -14,6 +14,11 @@ export function formatAlarmDate(value?: string): string {
   }).format(date);
 }
 
+export function formatAlarmTime(time?: string, timeText?: string): string {
+  if (timeText?.trim()) return timeText;
+  return formatAlarmDate(time);
+}
+
 export function getRealtimeStatusLabel(status: RealtimeStatus): string {
   if (status === "live") return "Đang trực tuyến";
   if (status === "offline") return "Mất kết nối";

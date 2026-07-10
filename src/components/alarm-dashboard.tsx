@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   formatAlarmDate,
+  formatAlarmTime,
   getAlarmListEmptyMessage,
   getRealtimeStatusLabel,
   type RealtimeStatus
@@ -339,7 +340,7 @@ export function AlarmDashboard() {
                     <strong>{alarm.summary || "-"}</strong>
                     <small>{alarm.description || ""}</small>
                   </td>
-                  <td>{formatAlarmDate(alarm.time || alarm.timeText)}</td>
+                  <td>{formatAlarmTime(alarm.time, alarm.timeText)}</td>
                   <td>
                     <Link className="text-link" href={`/alarms/${alarm.id}`}>
                       Chi tiết

@@ -1,0 +1,18 @@
+[Unit]
+Description=AI Box unique-visitor face-dedup worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/dashboard-ai-box/face-matching
+EnvironmentFile=/root/dashboard-ai-box/face-matching/worker.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/root/dashboard-ai-box/face-matching/.venv/bin/python worker.py
+Restart=on-failure
+RestartSec=5
+# It shares the box with the dashboard — stay low priority.
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

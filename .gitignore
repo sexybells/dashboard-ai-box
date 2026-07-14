@@ -6,3 +6,11 @@ storage
 coverage
 dist
 *.log
+*.tsbuildinfo
+
+# Python face-matching worker (venv + caches + runtime secret)
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+face-matching/worker.env

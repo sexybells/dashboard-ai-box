@@ -1,0 +1,6 @@
+# Face-matching service deps (Python 3.13). Versions below verified on macOS arm64.
+insightface==1.0.1
+onnxruntime==1.27.0
+opencv-python-headless==5.0.0.93
+numpy==2.5.1
+pymongo==4.16.0

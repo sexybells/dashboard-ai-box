@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# Runtime env — contains MONGODB_URI (secret). Created per-server by deploy.sh.
+worker.env
+# InsightFace downloads models under ~/.insightface by default, not here.
+models/

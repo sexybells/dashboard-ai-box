@@ -8,7 +8,8 @@ import {
   Mail,
   MessageSquare,
   Settings,
-  Users
+  Users,
+  Video
 } from "lucide-react";
 
 export interface NavItem {
@@ -32,6 +33,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Tổng quan", href: "/", icon: LayoutDashboard },
       { label: "Cảnh báo", href: "/alarms", icon: Bell },
+      { label: "Camera trực tiếp", href: "/camera", icon: Video },
       { label: "Lưu lượng khách", href: "/visitors", icon: Users },
       { label: "Phân tích", href: "/analytics", icon: BarChart3 }
     ]

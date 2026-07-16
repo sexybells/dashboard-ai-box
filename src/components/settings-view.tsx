@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { Copy } from "lucide-react";
+import { BoxHostSetting } from "@/components/settings/box-host-setting";
 import { useRealtimeStatus } from "@/components/use-realtime-status";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
@@ -55,6 +56,8 @@ export function SettingsView() {
           </div>
         </CardContent>
       </Card>
+
+      <BoxHostSetting />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>

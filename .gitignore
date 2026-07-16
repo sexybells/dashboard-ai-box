@@ -8,6 +8,10 @@ dist
 *.log
 *.tsbuildinfo
 
+# Runbook trien khai chua chi tiet truy cap root cua server production.
+# Repo nay public nen giu file o local.
+docs/deploy-unique-visitor-worker.md
+
 # Python face-matching worker (venv + caches + runtime secret)
 .venv/
 __pycache__/

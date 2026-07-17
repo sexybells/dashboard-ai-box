@@ -10,6 +10,14 @@ import { FALLBACK_BOX_HOST } from "@/lib/aibox/box-settings";
 // LAN. Giao diện box tự phát video qua `wss://<host>/video/` — đi chung cổng
 // HTTPS với trang nên xuyên proxy được, xem từ mạng nào cũng chạy.
 
+// Bề rộng `.sidebar-container` trong CSS của box (position:fixed, left:0), và
+// cũng là `margin-left` của `.main-container`. Sidebar nằm trong document khác
+// origin nên CSS bên này không với tới để `display:none` — same-origin policy.
+// Cách duy nhất từ phía dashboard là đẩy iframe sang trái đúng bề rộng đó rồi
+// để `overflow-hidden` của khung ngoài cắt đi: sidebar ra ngoài vùng nhìn, nội
+// dung về sát mép trái. Box đổi giao diện thì số này phải chỉnh theo.
+const BOX_SIDEBAR_WIDTH = 210;
+
 /** Trang cha HTTPS mà nhúng iframe HTTP thì trình duyệt chặn (mixed content). */
 function isMixedContent(src: string): boolean {
   if (typeof window === "undefined") return false;
@@ -45,45 +53,36 @@ export function CameraEmbed() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-brand">Camera</p>
-          <h2 className="mt-1 text-2xl font-semibold tracking-tight">Xem trực tiếp AI Box</h2>
-        </div>
-        {src ? (
-          <a
-            href={src}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground"
-          >
-            <ExternalLink className="size-4" />
-            Mở tab mới
-          </a>
-        ) : null}
-      </div>
-
       {/* Trang /camera bỏ giới hạn max-w-7xl (xem app-shell) nên khung dùng hết
           bề ngang. Giao diện box mất vài giây khởi động rồi mới vẽ — lớp phủ
           dưới đây chỉ che tới lúc iframe tải xong tài liệu. */}
-      <div className="relative h-[calc(100dvh-12rem)] min-h-[24rem] w-full overflow-hidden rounded-xl border border-border bg-black">
+      <div className="relative h-[calc(100dvh-8rem)] min-h-[24rem] w-full overflow-hidden rounded-xl border border-border bg-black">
         {blocked ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
             <p className="text-sm font-medium text-destructive">Không nhúng được giao diện box</p>
             <p className="max-w-md text-xs text-muted-foreground">
               Dashboard đang chạy HTTPS nhưng địa chỉ box là HTTP (<code className="rounded bg-muted px-1">{src}</code>),
-              nên trình duyệt chặn vì mixed content. Đổi box sang HTTPS ở trang{" "}
-              <strong>Cài đặt</strong>, hoặc bấm <strong>Mở tab mới</strong> ở trên.
+              nên trình duyệt chặn vì mixed content. Đổi box sang HTTPS ở trang <strong>Cài đặt</strong>.
             </p>
+            <a
+              href={src ?? "#"}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground"
+            >
+              <ExternalLink className="size-4" />
+              Mở tab mới
+            </a>
           </div>
         ) : src ? (
           <>
             <iframe
               src={src}
               title="Giao diện AI Box"
+              style={{ width: `calc(100% + ${BOX_SIDEBAR_WIDTH}px)`, marginLeft: `-${BOX_SIDEBAR_WIDTH}px` }}
               onLoad={() => setLoaded(true)}
               allow="autoplay; fullscreen"
-              className="h-full w-full border-0"
+              className="h-full border-0"
             />
             {loaded ? null : (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black">
@@ -99,8 +98,8 @@ export function CameraEmbed() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Khung trên nhúng thẳng giao diện AI Box, cần đăng nhập vào box lần đầu. Đổi địa chỉ box hoặc
-        link nhúng ở trang <strong>Cài đặt</strong>.
+        Khung trên nhúng giao diện AI Box và cắt bỏ sidebar của box, cần đăng nhập vào box lần đầu.
+        Đổi địa chỉ box hoặc link nhúng ở trang <strong>Cài đặt</strong>.
       </p>
     </div>
   );

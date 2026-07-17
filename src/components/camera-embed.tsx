@@ -10,13 +10,19 @@ import { FALLBACK_BOX_HOST } from "@/lib/aibox/box-settings";
 // LAN. Giao diện box tự phát video qua `wss://<host>/video/` — đi chung cổng
 // HTTPS với trang nên xuyên proxy được, xem từ mạng nào cũng chạy.
 
-// Bề rộng `.sidebar-container` trong CSS của box (position:fixed, left:0), và
-// cũng là `margin-left` của `.main-container`. Sidebar nằm trong document khác
-// origin nên CSS bên này không với tới để `display:none` — same-origin policy.
-// Cách duy nhất từ phía dashboard là đẩy iframe sang trái đúng bề rộng đó rồi
-// để `overflow-hidden` của khung ngoài cắt đi: sidebar ra ngoài vùng nhìn, nội
-// dung về sát mép trái. Box đổi giao diện thì số này phải chỉnh theo.
+// Chrome của giao diện box nằm trong document khác origin nên CSS bên này
+// không với tới để `display:none` — same-origin policy. Cách duy nhất từ phía
+// dashboard là đẩy iframe lệch đúng kích thước phần chrome rồi để
+// `overflow-hidden` của khung ngoài cắt đi. Cả hai phần chrome đều
+// position:fixed ở mép, còn vùng nội dung đã chừa sẵn chỗ cho chúng
+// (`.main-container{margin-left:210px}`, `.app-main{padding-top:50px}`), nên
+// đẩy lệch xong là nội dung về sát mép, không hụt gì.
+//
+// Hai số này bám theo CSS của box; box đổi giao diện là phải chỉnh lại:
+//   .sidebar-container{position:fixed;left:0;width:210px}
+//   .navbar{height:50px} trong .fixed-header{position:fixed;top:0}
 const BOX_SIDEBAR_WIDTH = 210;
+const BOX_NAVBAR_HEIGHT = 50;
 
 /** Trang cha HTTPS mà nhúng iframe HTTP thì trình duyệt chặn (mixed content). */
 function isMixedContent(src: string): boolean {
@@ -79,10 +85,15 @@ export function CameraEmbed() {
             <iframe
               src={src}
               title="Giao diện AI Box"
-              style={{ width: `calc(100% + ${BOX_SIDEBAR_WIDTH}px)`, marginLeft: `-${BOX_SIDEBAR_WIDTH}px` }}
+              style={{
+                width: `calc(100% + ${BOX_SIDEBAR_WIDTH}px)`,
+                marginLeft: `-${BOX_SIDEBAR_WIDTH}px`,
+                height: `calc(100% + ${BOX_NAVBAR_HEIGHT}px)`,
+                marginTop: `-${BOX_NAVBAR_HEIGHT}px`
+              }}
               onLoad={() => setLoaded(true)}
               allow="autoplay; fullscreen"
-              className="h-full border-0"
+              className="border-0"
             />
             {loaded ? null : (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black">

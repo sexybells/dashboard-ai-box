@@ -1,5 +1,5 @@
-import { CameraWebrtc } from "@/components/camera-webrtc";
+import { CameraEmbed } from "@/components/camera-embed";
 
 export default function CameraPage() {
-  return <CameraWebrtc />;
+  return <CameraEmbed />;
 }

@@ -61,14 +61,13 @@ export function CameraRedirectSetting() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Link mở giao diện box</CardTitle>
+        <CardTitle>Link nhúng giao diện box</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Link mở ra khi bấm vào khung camera trực tiếp. Giữ nguyên path và hash nên trỏ thẳng vào
-          deep link của box được, ví dụ{" "}
-          <code className="font-mono">http://192.168.1.26/#/preview/video</code>. Để trống thì dùng
-          địa chỉ AI Box ở trên.
+          Link nhúng vào trang Camera. Giữ nguyên path và hash nên trỏ thẳng vào deep link của box
+          được, ví dụ <code className="font-mono">http://192.168.1.26/#/preview/video</code>. Để
+          trống thì dùng địa chỉ AI Box ở trên.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <input

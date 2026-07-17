@@ -31,6 +31,7 @@ export function CameraWebrtc() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const clientRef = useRef<Zlm>(null);
   const [boxHost, setBoxHost] = useState<string | null>(null);
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
   const [cameras, setCameras] = useState<string[]>([]);
   const [channel, setChannel] = useState(DEFAULT_CHANNEL);
   const [pending, setPending] = useState(DEFAULT_CHANNEL);
@@ -47,6 +48,14 @@ export function CameraWebrtc() {
       .catch(() => {
         if (!cancelled) setBoxHost(FALLBACK_BOX_HOST);
       });
+    // Link redirect riêng (Cài đặt → Link mở giao diện box). Không cấu hình
+    // hoặc lỗi mạng thì để null, hai link dưới tự quay về host box.
+    fetch("/api/settings/camera-redirect")
+      .then((r) => r.json())
+      .then((d: { cameraRedirectUrl?: string | null }) => {
+        if (!cancelled) setRedirectUrl(d.cameraRedirectUrl ?? null);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -111,6 +120,11 @@ export function CameraWebrtc() {
     };
   }, [channel, boxHost]);
 
+  // Link cấu hình riêng thắng; không có thì giữ nguyên hành vi cũ: nút header
+  // vào deep link preview, overlay vào gốc box.
+  const headerHref = redirectUrl ?? (boxHost ? `${boxHost}/#/preview/video` : null);
+  const overlayHref = redirectUrl ?? boxHost;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -118,9 +132,9 @@ export function CameraWebrtc() {
           <p className="text-xs font-semibold uppercase tracking-wider text-brand">Camera</p>
           <h2 className="mt-1 text-2xl font-semibold tracking-tight">Xem trực tiếp AI Box</h2>
         </div>
-        {boxHost ? (
+        {headerHref ? (
           <a
-            href={`${boxHost}/#/preview/video`}
+            href={headerHref}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground"
@@ -176,9 +190,9 @@ export function CameraWebrtc() {
           luồng mosaic live autoplay/muted không cần play/pause. */}
       <div className="relative h-[calc(100dvh-12rem)] min-h-[24rem] w-full overflow-hidden rounded-xl border border-border bg-black">
         <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-contain" />
-        {boxHost ? (
+        {overlayHref ? (
           <a
-            href={boxHost}
+            href={overlayHref}
             target="_blank"
             rel="noreferrer"
             title="Mở giao diện box"

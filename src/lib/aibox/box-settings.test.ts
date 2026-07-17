@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { FALLBACK_BOX_HOST, normalizeBoxHost, resolveDefaultBoxHost } from "./box-settings";
+import {
+  FALLBACK_BOX_HOST,
+  normalizeBoxHost,
+  normalizeRedirectUrl,
+  resolveDefaultBoxHost
+} from "./box-settings";
 
 describe("normalizeBoxHost", () => {
   it("assumes http for a bare host", () => {
@@ -37,6 +42,54 @@ describe("normalizeBoxHost", () => {
 
   it("rejects unparseable input", () => {
     expect(normalizeBoxHost("http://")).toBeNull();
+  });
+});
+
+describe("normalizeRedirectUrl", () => {
+  it("keeps the hash deep link that normalizeBoxHost would strip", () => {
+    expect(normalizeRedirectUrl("http://192.168.1.26/#/preview/video")).toBe(
+      "http://192.168.1.26/#/preview/video"
+    );
+  });
+
+  it("keeps path and query", () => {
+    expect(normalizeRedirectUrl("https://box.local/ui/live?ch=2")).toBe("https://box.local/ui/live?ch=2");
+  });
+
+  it("returns a bare origin without a trailing slash", () => {
+    expect(normalizeRedirectUrl("192.168.1.26")).toBe("http://192.168.1.26");
+    expect(normalizeRedirectUrl("http://192.168.1.26/")).toBe("http://192.168.1.26");
+    expect(normalizeRedirectUrl("192.168.1.26:8080")).toBe("http://192.168.1.26:8080");
+  });
+
+  it("trims surrounding whitespace", () => {
+    expect(normalizeRedirectUrl("  http://192.168.1.26/#/preview/video  ")).toBe(
+      "http://192.168.1.26/#/preview/video"
+    );
+  });
+
+  it("rejects empty input", () => {
+    expect(normalizeRedirectUrl("")).toBeNull();
+    expect(normalizeRedirectUrl("   ")).toBeNull();
+  });
+
+  it("rejects non-http schemes", () => {
+    expect(normalizeRedirectUrl("ftp://192.168.1.26")).toBeNull();
+    expect(normalizeRedirectUrl("javascript:alert(1)")).toBeNull();
+    expect(normalizeRedirectUrl("javascript://alert")).toBeNull();
+  });
+
+  it("never returns a non-http(s) href", () => {
+    // Vào href của <a> nên scheme phải chốt cứng http(s), không để lọt
+    // javascript:/data: dù input có bọc kiểu gì.
+    for (const input of ["javascript:void(0)", "data:text/html,<script>alert(1)</script>", "vbscript:msgbox"]) {
+      const out = normalizeRedirectUrl(input);
+      expect(out === null || /^https?:\/\//.test(out)).toBe(true);
+    }
+  });
+
+  it("rejects unparseable input", () => {
+    expect(normalizeRedirectUrl("http://")).toBeNull();
   });
 });
 

@@ -3,6 +3,15 @@ export const PAGE_GAP = "gap" as const;
 export type PageSlot = number | typeof PAGE_GAP;
 
 /**
+ * Keeps a requested page inside the available range. An emptied result set has
+ * no pages at all, and page 1 is the only sensible place to land.
+ */
+export function clampPage(page: number, totalPages: number): number {
+  const lastPage = Math.max(1, totalPages);
+  return Math.min(Math.max(1, page), lastPage);
+}
+
+/**
  * Builds a compact page list: first and last page are always reachable, with a
  * window around the current page and gaps standing in for the skipped ranges.
  */

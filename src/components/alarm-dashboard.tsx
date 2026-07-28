@@ -15,7 +15,7 @@ import { LoadingState } from "@/components/ui/loading-state";
 import { Pagination } from "@/components/ui/pagination";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusPill } from "@/components/ui/status-pill";
-import { getPageRange } from "@/lib/pagination";
+import { clampPage, getPageRange } from "@/lib/pagination";
 import { getWebhookUrl } from "@/lib/webhook-url";
 import type { AlarmRealtimeEvent } from "@/services/alarm-events";
 import {
@@ -31,7 +31,7 @@ import {
   toggleAllSelection,
   toggleSelection
 } from "@/services/alarm-selection";
-import { mergeRealtimeAlarm, removeAlarmsFromList } from "@/services/realtime-alarm-list";
+import { mergeRealtimeAlarm } from "@/services/realtime-alarm-list";
 
 const emptyResponse: AlarmListResponse = {
   data: [],
@@ -69,6 +69,7 @@ export function AlarmDashboard() {
     summary: "",
     mediaName: ""
   });
+  const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<AlarmListResponse>(emptyResponse);
   const [isLoading, setIsLoading] = useState(true);
@@ -83,6 +84,12 @@ export function AlarmDashboard() {
   const [isDeleting, setIsDeleting] = useState(false);
   const dataRef = useRef<AlarmListResponse>(emptyResponse);
   const highlightTimersRef = useRef<number[]>([]);
+
+  // The realtime handler reads these through refs so that changing a filter or
+  // turning a page never tears down and reopens the SSE connection.
+  const filtersRef = useRef(filters);
+  const pageRef = useRef(page);
+  const loadAlarmsRef = useRef<() => void>(() => {});
 
   const clearHighlightTimers = useCallback(() => {
     for (const timer of highlightTimersRef.current) {
@@ -113,10 +120,11 @@ export function AlarmDashboard() {
     try {
       const result = await fetchAlarmList(filters, page);
 
-      // Deleting the last rows of the final page shrinks the range under foot;
-      // step back and let the page change trigger a fresh load.
-      if (result.totalPages > 0 && page > result.totalPages) {
-        setPage(result.totalPages);
+      // Deleting rows can shrink the range under foot, including down to an
+      // empty list; step back and let the page change trigger a fresh load.
+      const clamped = clampPage(page, result.totalPages);
+      if (clamped !== page) {
+        setPage(clamped);
         return;
       }
 
@@ -137,6 +145,23 @@ export function AlarmDashboard() {
       setIsLoading(false);
     }
   }, [clearHighlightTimers, filters, page]);
+
+  useEffect(() => {
+    filtersRef.current = filters;
+    pageRef.current = page;
+    loadAlarmsRef.current = () => void loadAlarms();
+  });
+
+  // Typing shouldn't fire a request per keystroke; settle first, then search.
+  useEffect(() => {
+    if (searchInput === filtersRef.current.q) return;
+
+    const timer = window.setTimeout(() => {
+      updateFilters({ q: searchInput });
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [searchInput, updateFilters]);
 
   useEffect(() => {
     const initialTimer = window.setTimeout(() => {
@@ -170,25 +195,30 @@ export function AlarmDashboard() {
       try {
         payload = JSON.parse(message.data) as AlarmRealtimeEvent;
       } catch {
-        void loadAlarms();
+        loadAlarmsRef.current();
         return;
       }
 
       if (!payload.alarm) {
-        void loadAlarms();
+        loadAlarmsRef.current();
         return;
       }
 
       // Newest alarms belong at the top of page 1; on any other page the list
       // stays put and only the counter moves, so the user keeps their place.
-      if (page !== 1) {
+      if (pageRef.current !== 1) {
         setNewAlarmCount((current) => current + 1);
         setLastUpdated(new Date());
         return;
       }
 
       const hadAlarm = dataRef.current.data.some((alarm) => alarm.id === payload?.alarm?.id);
-      const result = mergeRealtimeAlarm(dataRef.current, payload.alarm, filters, dataRef.current.limit);
+      const result = mergeRealtimeAlarm(
+        dataRef.current,
+        payload.alarm,
+        filtersRef.current,
+        dataRef.current.limit
+      );
       dataRef.current = result.data;
       setData(result.data);
       setSelectedAlarmIds((current) =>
@@ -215,7 +245,7 @@ export function AlarmDashboard() {
       window.clearTimeout(webhookUrlTimer);
       source.close();
     };
-  }, [filters, loadAlarms, markAlarmHighlighted, page]);
+  }, [markAlarmHighlighted]);
 
   useEffect(() => {
     return () => {
@@ -229,16 +259,13 @@ export function AlarmDashboard() {
     setIsDeleting(true);
     try {
       await deleteAlarms(pendingDeletion.ids);
-
-      const deletedIds = new Set(pendingDeletion.ids);
-      const result = removeAlarmsFromList(dataRef.current, deletedIds);
-      dataRef.current = result;
-      setData(result);
-      setSelectedAlarmIds((current) => pruneSelection(current, result.data.map((alarm) => alarm.id)));
       setPendingDeletion(null);
       setError(null);
-      // The page now has a gap: refetch so rows from the next page move up.
-      void loadAlarms();
+      // The page now has a gap. Refetch rather than splicing rows out locally:
+      // rows from the next page have to move up, and the page itself may no
+      // longer exist. The old rows stay on screen until the new ones arrive,
+      // which reads better than blanking the table mid-request.
+      await loadAlarms();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Xoá cảnh báo thất bại");
       setPendingDeletion(null);
@@ -252,6 +279,9 @@ export function AlarmDashboard() {
   const cameras = uniqueValues(data.data, "mediaName");
   const hasActiveFilters = Boolean(filters.q || filters.taskSession || filters.summary || filters.mediaName);
   const isInitialLoading = isLoading && data.data.length === 0;
+  // The rows on screen still belong to the previous page until the request for
+  // the requested one lands. A background refresh never triggers this.
+  const isPageChanging = page !== data.page;
   const selectedCount = selectedAlarmIds.size;
   const range = getPageRange(data.page, data.limit, data.data.length, data.total);
   const rowCountLabel =
@@ -311,8 +341,8 @@ export function AlarmDashboard() {
             Tìm kiếm
             <input
               className={inputClass}
-              value={filters.q}
-              onChange={(event) => updateFilters({ q: event.target.value })}
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
               placeholder="Mã cảnh báo, tác vụ, camera..."
             />
           </label>
@@ -414,35 +444,40 @@ export function AlarmDashboard() {
             />
           </div>
         ) : (
-          <AlarmTable
-            alarms={data.data}
-            highlightedAlarmIds={highlightedAlarmIds}
-            selectedAlarmIds={selectedAlarmIds}
-            isDeleting={isDeleting}
-            emptyMessage={getAlarmListEmptyMessage(hasActiveFilters)}
-            showEmptyState={!isLoading && data.data.length === 0}
-            onToggleAlarm={(id) => setSelectedAlarmIds((current) => toggleSelection(current, id))}
-            onToggleAll={() =>
-              setSelectedAlarmIds((current) =>
-                toggleAllSelection(current, data.data.map((alarm) => alarm.id))
-              )
-            }
-            onDeleteAlarm={(alarm) =>
-              setPendingDeletion({
-                ids: [alarm.id],
-                description: `Cảnh báo "${describeAlarm(alarm)}" sẽ bị xoá vĩnh viễn.`
-              })
-            }
-          />
+          <div
+            aria-busy={isPageChanging}
+            className={isPageChanging ? "opacity-50 transition-opacity" : "transition-opacity"}
+          >
+            <AlarmTable
+              alarms={data.data}
+              highlightedAlarmIds={highlightedAlarmIds}
+              selectedAlarmIds={selectedAlarmIds}
+              isDeleting={isDeleting}
+              emptyMessage={getAlarmListEmptyMessage(hasActiveFilters)}
+              showEmptyState={!isLoading && data.data.length === 0}
+              onToggleAlarm={(id) => setSelectedAlarmIds((current) => toggleSelection(current, id))}
+              onToggleAll={() =>
+                setSelectedAlarmIds((current) =>
+                  toggleAllSelection(current, data.data.map((alarm) => alarm.id))
+                )
+              }
+              onDeleteAlarm={(alarm) =>
+                setPendingDeletion({
+                  ids: [alarm.id],
+                  description: `Cảnh báo "${describeAlarm(alarm)}" sẽ bị xoá vĩnh viễn.`
+                })
+              }
+            />
+          </div>
         )}
 
         {data.totalPages > 1 && !isInitialLoading ? (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
             <span className="text-xs text-muted-foreground">
-              Trang {data.page.toLocaleString("vi-VN")} / {data.totalPages.toLocaleString("vi-VN")}
+              Trang {page.toLocaleString("vi-VN")} / {data.totalPages.toLocaleString("vi-VN")}
             </span>
             <Pagination
-              page={data.page}
+              page={page}
               totalPages={data.totalPages}
               disabled={isDeleting}
               onPageChange={setPage}

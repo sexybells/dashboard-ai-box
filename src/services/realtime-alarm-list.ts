@@ -72,27 +72,3 @@ export function mergeRealtimeAlarm(
     highlightedId: matches ? alarm.id : null
   };
 }
-
-/**
- * Drops deleted alarms from the displayed list and adjusts the counters, so the
- * table updates without waiting for the next refetch.
- */
-export function removeAlarmsFromList(
-  current: AlarmListResponse,
-  deletedIds: ReadonlySet<string>
-): AlarmListResponse {
-  const data = current.data.filter((item) => !deletedIds.has(item.id));
-  const removed = current.data.length - data.length;
-
-  if (removed === 0) return current;
-
-  const total = Math.max(0, current.total - removed);
-
-  return {
-    ...current,
-    data,
-    total,
-    allTotal: Math.max(0, current.allTotal - removed),
-    totalPages: Math.ceil(total / current.limit)
-  };
-}

@@ -1,5 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { getPageRange, getPageSlots, PAGE_GAP } from "./pagination";
+import { clampPage, getPageRange, getPageSlots, PAGE_GAP } from "./pagination";
+
+describe("clampPage", () => {
+  it("returns page 1 once the result set is emptied", () => {
+    expect(clampPage(2, 0)).toBe(1);
+  });
+
+  it("steps back when the requested page no longer exists", () => {
+    expect(clampPage(5, 2)).toBe(2);
+  });
+
+  it("keeps a page that is still inside the range", () => {
+    expect(clampPage(2, 10)).toBe(2);
+  });
+
+  it("never goes below the first page", () => {
+    expect(clampPage(0, 10)).toBe(1);
+    expect(clampPage(-3, 10)).toBe(1);
+  });
+});
 
 describe("getPageSlots", () => {
   it("returns nothing when there is no page", () => {

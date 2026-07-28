@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AlarmListItem, AlarmListResponse } from "./alarm-client";
-import { alarmMatchesFilters, mergeRealtimeAlarm, removeAlarmsFromList } from "./realtime-alarm-list";
+import { alarmMatchesFilters, mergeRealtimeAlarm } from "./realtime-alarm-list";
 
 const baseResponse: AlarmListResponse = {
   data: [
@@ -99,21 +99,5 @@ describe("realtime alarm list merging", () => {
     expect(alarmMatchesFilters(alarm, { ...emptyFilters, q: "main gate" })).toBe(true);
     expect(alarmMatchesFilters(alarm, { ...emptyFilters, q: "north" })).toBe(true);
     expect(alarmMatchesFilters(alarm, { ...emptyFilters, q: "warehouse" })).toBe(false);
-  });
-});
-
-describe("removeAlarmsFromList", () => {
-  it("drops deleted rows and lowers the counters", () => {
-    const result = removeAlarmsFromList({ ...baseResponse, total: 5, allTotal: 9 }, new Set(["old-1"]));
-
-    expect(result.data).toEqual([]);
-    expect(result.total).toBe(4);
-    expect(result.allTotal).toBe(8);
-  });
-
-  it("keeps the same response when nothing on screen was deleted", () => {
-    const result = removeAlarmsFromList(baseResponse, new Set(["not-listed"]));
-
-    expect(result).toBe(baseResponse);
   });
 });

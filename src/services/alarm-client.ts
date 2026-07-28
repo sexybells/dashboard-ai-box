@@ -37,8 +37,10 @@ export interface AlarmFilters {
   mediaName: string;
 }
 
-export function buildAlarmListQuery(filters: AlarmFilters, limit = 30): string {
-  const params = new URLSearchParams({ limit: String(limit) });
+export const ALARM_PAGE_SIZE = 30;
+
+export function buildAlarmListQuery(filters: AlarmFilters, page = 1, limit = ALARM_PAGE_SIZE): string {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
 
   for (const [key, value] of Object.entries(filters)) {
     const trimmed = value.trim();
@@ -48,8 +50,8 @@ export function buildAlarmListQuery(filters: AlarmFilters, limit = 30): string {
   return params.toString();
 }
 
-export async function fetchAlarmList(filters: AlarmFilters): Promise<AlarmListResponse> {
-  const response = await fetch(`/api/alarms?${buildAlarmListQuery(filters)}`, { cache: "no-store" });
+export async function fetchAlarmList(filters: AlarmFilters, page = 1): Promise<AlarmListResponse> {
+  const response = await fetch(`/api/alarms?${buildAlarmListQuery(filters, page)}`, { cache: "no-store" });
 
   if (!response.ok) {
     throw new Error(`Failed to load alarms: ${response.status}`);

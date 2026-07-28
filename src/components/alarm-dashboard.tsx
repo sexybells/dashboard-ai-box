@@ -12,13 +12,16 @@ import { AlarmTable } from "@/components/alarm-table";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LoadingState } from "@/components/ui/loading-state";
+import { Pagination } from "@/components/ui/pagination";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusPill } from "@/components/ui/status-pill";
+import { getPageRange } from "@/lib/pagination";
 import { getWebhookUrl } from "@/lib/webhook-url";
 import type { AlarmRealtimeEvent } from "@/services/alarm-events";
 import {
   deleteAlarms,
   fetchAlarmList,
+  ALARM_PAGE_SIZE,
   type AlarmFilters,
   type AlarmListItem,
   type AlarmListResponse
@@ -35,7 +38,7 @@ const emptyResponse: AlarmListResponse = {
   total: 0,
   allTotal: 0,
   page: 1,
-  limit: 20,
+  limit: ALARM_PAGE_SIZE,
   totalPages: 0
 };
 
@@ -66,6 +69,7 @@ export function AlarmDashboard() {
     summary: "",
     mediaName: ""
   });
+  const [page, setPage] = useState(1);
   const [data, setData] = useState<AlarmListResponse>(emptyResponse);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,9 +103,23 @@ export function AlarmDashboard() {
     highlightTimersRef.current.push(timer);
   }, []);
 
+  // Filters describe a different result set, so any change restarts at page 1.
+  const updateFilters = useCallback((change: Partial<AlarmFilters>) => {
+    setFilters((current) => ({ ...current, ...change }));
+    setPage(1);
+  }, []);
+
   const loadAlarms = useCallback(async () => {
     try {
-      const result = await fetchAlarmList(filters);
+      const result = await fetchAlarmList(filters, page);
+
+      // Deleting the last rows of the final page shrinks the range under foot;
+      // step back and let the page change trigger a fresh load.
+      if (result.totalPages > 0 && page > result.totalPages) {
+        setPage(result.totalPages);
+        return;
+      }
+
       dataRef.current = result;
       setData(result);
       // Rows can disappear between refreshes; keep only ids still on screen.
@@ -118,7 +136,7 @@ export function AlarmDashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [clearHighlightTimers, filters]);
+  }, [clearHighlightTimers, filters, page]);
 
   useEffect(() => {
     const initialTimer = window.setTimeout(() => {
@@ -161,6 +179,14 @@ export function AlarmDashboard() {
         return;
       }
 
+      // Newest alarms belong at the top of page 1; on any other page the list
+      // stays put and only the counter moves, so the user keeps their place.
+      if (page !== 1) {
+        setNewAlarmCount((current) => current + 1);
+        setLastUpdated(new Date());
+        return;
+      }
+
       const hadAlarm = dataRef.current.data.some((alarm) => alarm.id === payload?.alarm?.id);
       const result = mergeRealtimeAlarm(dataRef.current, payload.alarm, filters, dataRef.current.limit);
       dataRef.current = result.data;
@@ -189,7 +215,7 @@ export function AlarmDashboard() {
       window.clearTimeout(webhookUrlTimer);
       source.close();
     };
-  }, [filters, loadAlarms, markAlarmHighlighted]);
+  }, [filters, loadAlarms, markAlarmHighlighted, page]);
 
   useEffect(() => {
     return () => {
@@ -211,21 +237,27 @@ export function AlarmDashboard() {
       setSelectedAlarmIds((current) => pruneSelection(current, result.data.map((alarm) => alarm.id)));
       setPendingDeletion(null);
       setError(null);
+      // The page now has a gap: refetch so rows from the next page move up.
+      void loadAlarms();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Xoá cảnh báo thất bại");
       setPendingDeletion(null);
     } finally {
       setIsDeleting(false);
     }
-  }, [pendingDeletion]);
+  }, [loadAlarms, pendingDeletion]);
 
   const taskSessions = uniqueValues(data.data, "taskSession");
   const summaries = uniqueValues(data.data, "summary");
   const cameras = uniqueValues(data.data, "mediaName");
   const hasActiveFilters = Boolean(filters.q || filters.taskSession || filters.summary || filters.mediaName);
-  const rowCountLabel = `${data.data.length.toLocaleString("vi-VN")} dòng`;
   const isInitialLoading = isLoading && data.data.length === 0;
   const selectedCount = selectedAlarmIds.size;
+  const range = getPageRange(data.page, data.limit, data.data.length, data.total);
+  const rowCountLabel =
+    range.total === 0
+      ? "0 dòng"
+      : `${range.from.toLocaleString("vi-VN")}–${range.to.toLocaleString("vi-VN")} trên ${range.total.toLocaleString("vi-VN")}`;
 
   return (
     <div className="space-y-6">
@@ -280,7 +312,7 @@ export function AlarmDashboard() {
             <input
               className={inputClass}
               value={filters.q}
-              onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))}
+              onChange={(event) => updateFilters({ q: event.target.value })}
               placeholder="Mã cảnh báo, tác vụ, camera..."
             />
           </label>
@@ -289,7 +321,7 @@ export function AlarmDashboard() {
             <select
               className={inputClass}
               value={filters.taskSession}
-              onChange={(event) => setFilters((current) => ({ ...current, taskSession: event.target.value }))}
+              onChange={(event) => updateFilters({ taskSession: event.target.value })}
             >
               <option value="">Tất cả tác vụ</option>
               {taskSessions.map((value) => (
@@ -304,7 +336,7 @@ export function AlarmDashboard() {
             <select
               className={inputClass}
               value={filters.summary}
-              onChange={(event) => setFilters((current) => ({ ...current, summary: event.target.value }))}
+              onChange={(event) => updateFilters({ summary: event.target.value })}
             >
               <option value="">Tất cả loại cảnh báo</option>
               {summaries.map((value) => (
@@ -319,7 +351,7 @@ export function AlarmDashboard() {
             <select
               className={inputClass}
               value={filters.mediaName}
-              onChange={(event) => setFilters((current) => ({ ...current, mediaName: event.target.value }))}
+              onChange={(event) => updateFilters({ mediaName: event.target.value })}
             >
               <option value="">Tất cả camera</option>
               {cameras.map((value) => (
@@ -403,6 +435,20 @@ export function AlarmDashboard() {
             }
           />
         )}
+
+        {data.totalPages > 1 && !isInitialLoading ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
+            <span className="text-xs text-muted-foreground">
+              Trang {data.page.toLocaleString("vi-VN")} / {data.totalPages.toLocaleString("vi-VN")}
+            </span>
+            <Pagination
+              page={data.page}
+              totalPages={data.totalPages}
+              disabled={isDeleting}
+              onPageChange={setPage}
+            />
+          </div>
+        ) : null}
       </Card>
 
       <ConfirmDialog

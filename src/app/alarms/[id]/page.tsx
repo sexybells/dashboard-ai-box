@@ -1,4 +1,5 @@
 import { ArrowLeft } from "lucide-react";
+import { AlarmDeleteButton } from "@/components/alarm-delete-button";
 import { AlarmDetail } from "@/components/alarm-detail";
 import { connectMongo } from "@/lib/mongodb";
 import { AlarmModel } from "@/models/alarm";
@@ -33,13 +34,19 @@ export default async function AlarmDetailPage({ params }: AlarmDetailPageProps) 
             {alarm.taskSession || alarm.summary || "Cảnh báo AI Box"}
           </h2>
         </div>
-        <Link
-          href="/alarms"
-          className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-card px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Quay lại
-        </Link>
+        <div className="flex flex-wrap items-center justify-end gap-2.5">
+          <Link
+            href="/alarms"
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-card px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+          >
+            <ArrowLeft className="size-4" />
+            Quay lại
+          </Link>
+          <AlarmDeleteButton
+            alarmId={String(alarm._id)}
+            alarmLabel={alarm.taskSession || alarm.summary || "Cảnh báo AI Box"}
+          />
+        </div>
       </div>
       <AlarmDetail
         alarm={{

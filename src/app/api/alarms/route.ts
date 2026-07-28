@@ -1,5 +1,6 @@
 import { connectMongo } from "@/lib/mongodb";
 import { AlarmModel, type AlarmDocument } from "@/models/alarm";
+import { deleteAlarmsByIds, parseDeleteIds } from "@/services/alarm-deletion";
 import { serializeAlarmListItem } from "@/services/alarm-serializer";
 import type { QueryFilter } from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
@@ -70,4 +71,23 @@ export async function GET(request: NextRequest) {
     allTotal,
     totalPages: Math.ceil(total / limit)
   });
+}
+
+export async function DELETE(request: NextRequest) {
+  let body: unknown;
+
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ ok: false, error: "Dữ liệu không hợp lệ" }, { status: 400 });
+  }
+
+  const parsed = parseDeleteIds(body);
+  if (!parsed.ok) {
+    return NextResponse.json({ ok: false, error: parsed.error }, { status: 400 });
+  }
+
+  const deleted = await deleteAlarmsByIds(parsed.ids);
+
+  return NextResponse.json({ ok: true, deleted });
 }

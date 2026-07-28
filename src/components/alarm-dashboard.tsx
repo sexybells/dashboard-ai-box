@@ -1,29 +1,34 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy, RefreshCw } from "lucide-react";
+import { Copy, RefreshCw, Trash2 } from "lucide-react";
 import {
   formatAlarmDate,
-  formatAlarmTime,
   getAlarmListEmptyMessage,
   getRealtimeStatusLabel,
   type RealtimeStatus
 } from "@/components/alarm-display";
+import { AlarmTable } from "@/components/alarm-table";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LoadingState } from "@/components/ui/loading-state";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { getWebhookUrl } from "@/lib/webhook-url";
 import type { AlarmRealtimeEvent } from "@/services/alarm-events";
 import {
+  deleteAlarms,
   fetchAlarmList,
   type AlarmFilters,
   type AlarmListItem,
   type AlarmListResponse
 } from "@/services/alarm-client";
-import { mergeRealtimeAlarm } from "@/services/realtime-alarm-list";
+import {
+  pruneSelection,
+  toggleAllSelection,
+  toggleSelection
+} from "@/services/alarm-selection";
+import { mergeRealtimeAlarm, removeAlarmsFromList } from "@/services/realtime-alarm-list";
 
 const emptyResponse: AlarmListResponse = {
   data: [],
@@ -44,6 +49,16 @@ function uniqueValues(items: AlarmListItem[], key: keyof AlarmListItem): string[
   ).sort((a, b) => a.localeCompare(b));
 }
 
+interface PendingDeletion {
+  ids: string[];
+  description: string;
+}
+
+function describeAlarm(alarm: AlarmListItem): string {
+  const label = [alarm.summary, alarm.mediaName].filter(Boolean).join(" — ");
+  return label || alarm.taskSession || alarm.alarmId || alarm.id;
+}
+
 export function AlarmDashboard() {
   const [filters, setFilters] = useState<AlarmFilters>({
     q: "",
@@ -59,6 +74,9 @@ export function AlarmDashboard() {
   const [webhookUrl, setWebhookUrl] = useState(getWebhookUrl());
   const [highlightedAlarmIds, setHighlightedAlarmIds] = useState<Set<string>>(() => new Set());
   const [newAlarmCount, setNewAlarmCount] = useState(0);
+  const [selectedAlarmIds, setSelectedAlarmIds] = useState<Set<string>>(() => new Set());
+  const [pendingDeletion, setPendingDeletion] = useState<PendingDeletion | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const dataRef = useRef<AlarmListResponse>(emptyResponse);
   const highlightTimersRef = useRef<number[]>([]);
 
@@ -86,6 +104,10 @@ export function AlarmDashboard() {
       const result = await fetchAlarmList(filters);
       dataRef.current = result;
       setData(result);
+      // Rows can disappear between refreshes; keep only ids still on screen.
+      setSelectedAlarmIds((current) =>
+        pruneSelection(current, result.data.map((alarm) => alarm.id))
+      );
       setNewAlarmCount(0);
       clearHighlightTimers();
       setHighlightedAlarmIds(new Set());
@@ -143,6 +165,9 @@ export function AlarmDashboard() {
       const result = mergeRealtimeAlarm(dataRef.current, payload.alarm, filters, dataRef.current.limit);
       dataRef.current = result.data;
       setData(result.data);
+      setSelectedAlarmIds((current) =>
+        pruneSelection(current, result.data.data.map((alarm) => alarm.id))
+      );
       setIsLoading(false);
       setLastUpdated(new Date());
       setError(null);
@@ -172,12 +197,35 @@ export function AlarmDashboard() {
     };
   }, [clearHighlightTimers]);
 
+  const confirmDeletion = useCallback(async () => {
+    if (!pendingDeletion) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteAlarms(pendingDeletion.ids);
+
+      const deletedIds = new Set(pendingDeletion.ids);
+      const result = removeAlarmsFromList(dataRef.current, deletedIds);
+      dataRef.current = result;
+      setData(result);
+      setSelectedAlarmIds((current) => pruneSelection(current, result.data.map((alarm) => alarm.id)));
+      setPendingDeletion(null);
+      setError(null);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Xoá cảnh báo thất bại");
+      setPendingDeletion(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [pendingDeletion]);
+
   const taskSessions = uniqueValues(data.data, "taskSession");
   const summaries = uniqueValues(data.data, "summary");
   const cameras = uniqueValues(data.data, "mediaName");
   const hasActiveFilters = Boolean(filters.q || filters.taskSession || filters.summary || filters.mediaName);
   const rowCountLabel = `${data.data.length.toLocaleString("vi-VN")} dòng`;
   const isInitialLoading = isLoading && data.data.length === 0;
+  const selectedCount = selectedAlarmIds.size;
 
   return (
     <div className="space-y-6">
@@ -288,6 +336,27 @@ export function AlarmDashboard() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <h3 className="text-sm font-semibold tracking-tight">Cảnh báo gần đây</h3>
           <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+            {selectedCount > 0 ? (
+              <>
+                <span className="font-semibold text-foreground">
+                  Đã chọn {selectedCount.toLocaleString("vi-VN")}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPendingDeletion({
+                      ids: [...selectedAlarmIds],
+                      description: `${selectedCount.toLocaleString("vi-VN")} cảnh báo đã chọn sẽ bị xoá vĩnh viễn.`
+                    })
+                  }
+                  disabled={isDeleting}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md bg-destructive px-3 text-xs font-semibold text-destructive-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+                >
+                  <Trash2 className="size-3.5" />
+                  Xoá đã chọn
+                </button>
+              </>
+            ) : null}
             {newAlarmCount > 0 ? (
               <span className="rounded-full border border-success/30 bg-success/10 px-2 py-0.5 font-semibold text-success">
                 {newAlarmCount.toLocaleString("vi-VN")} cảnh báo mới
@@ -313,87 +382,37 @@ export function AlarmDashboard() {
             />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <th className="px-4 py-3">Ảnh</th>
-                  <th className="px-4 py-3">Tác vụ</th>
-                  <th className="px-4 py-3">Camera</th>
-                  <th className="px-4 py-3">Cảnh báo</th>
-                  <th className="px-4 py-3">Thời gian</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {data.data.map((alarm) => (
-                  <tr
-                    key={alarm.id}
-                    className={cnRow(highlightedAlarmIds.has(alarm.id))}
-                  >
-                    <td className="px-4 py-3 align-middle">
-                      <div className="flex size-16 items-center justify-center overflow-hidden rounded-md border border-border bg-muted text-[11px] text-muted-foreground">
-                        {alarm.imageUrl ? (
-                          <Image
-                            src={alarm.imageUrl}
-                            alt={alarm.summary || "Cảnh báo AI Box"}
-                            width={96}
-                            height={64}
-                            unoptimized
-                            className="size-full object-cover"
-                          />
-                        ) : (
-                          <span>{alarm.imageKind}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <span className="block font-medium break-words">{alarm.taskSession || "-"}</span>
-                      <span className="mt-0.5 block max-w-[280px] truncate text-xs text-muted-foreground">
-                        {alarm.taskDesc || alarm.boardIp || ""}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <span className="block font-medium break-words">{alarm.mediaName || "-"}</span>
-                      <span className="mt-0.5 block max-w-[280px] truncate text-xs text-muted-foreground">
-                        {alarm.mediaUrl || ""}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <span className="block font-medium break-words">{alarm.summary || "-"}</span>
-                      <span className="mt-0.5 block max-w-[280px] truncate text-xs text-muted-foreground">
-                        {alarm.description || ""}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 align-middle whitespace-nowrap">{formatAlarmTime(alarm.time, alarm.timeText)}</td>
-                    <td className="px-4 py-3 align-middle">
-                      <Link className="font-medium text-brand hover:underline" href={`/alarms/${alarm.id}`}>
-                        Chi tiết
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-                {!isLoading && data.data.length === 0 ? (
-                  <tr>
-                    <td colSpan={6}>
-                      <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-                        {getAlarmListEmptyMessage(hasActiveFilters)}
-                      </div>
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+          <AlarmTable
+            alarms={data.data}
+            highlightedAlarmIds={highlightedAlarmIds}
+            selectedAlarmIds={selectedAlarmIds}
+            isDeleting={isDeleting}
+            emptyMessage={getAlarmListEmptyMessage(hasActiveFilters)}
+            showEmptyState={!isLoading && data.data.length === 0}
+            onToggleAlarm={(id) => setSelectedAlarmIds((current) => toggleSelection(current, id))}
+            onToggleAll={() =>
+              setSelectedAlarmIds((current) =>
+                toggleAllSelection(current, data.data.map((alarm) => alarm.id))
+              )
+            }
+            onDeleteAlarm={(alarm) =>
+              setPendingDeletion({
+                ids: [alarm.id],
+                description: `Cảnh báo "${describeAlarm(alarm)}" sẽ bị xoá vĩnh viễn.`
+              })
+            }
+          />
         )}
       </Card>
+
+      <ConfirmDialog
+        open={pendingDeletion !== null}
+        title="Xoá cảnh báo?"
+        description={`${pendingDeletion?.description ?? ""} Hành động này không thể hoàn tác.`}
+        isBusy={isDeleting}
+        onConfirm={() => void confirmDeletion()}
+        onCancel={() => setPendingDeletion(null)}
+      />
     </div>
   );
-}
-
-// Row style with a fade highlight for newly-arrived alarms.
-function cnRow(highlighted: boolean): string {
-  return highlighted
-    ? "border-b border-border bg-success/10 transition-colors"
-    : "border-b border-border transition-colors hover:bg-muted/40";
 }

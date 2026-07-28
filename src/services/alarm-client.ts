@@ -57,3 +57,22 @@ export async function fetchAlarmList(filters: AlarmFilters): Promise<AlarmListRe
 
   return (await response.json()) as AlarmListResponse;
 }
+
+/** Permanently deletes the given alarms and returns how many were removed. */
+export async function deleteAlarms(ids: readonly string[]): Promise<number> {
+  const response = await fetch("/api/alarms", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids })
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | { ok?: boolean; deleted?: number; error?: string }
+    | null;
+
+  if (!response.ok) {
+    throw new Error(payload?.error || `Xoá cảnh báo thất bại (${response.status})`);
+  }
+
+  return payload?.deleted ?? 0;
+}

@@ -1,0 +1,84 @@
+# Mẫu config MediaMTX cho dev harness (Phase 1) — copy thành mediamtx.dev.yml
+# (đã gitignore) rồi điền RTSP thật. KHÔNG commit credentials.
+#
+#   cp mediamtx.dev.example.yml mediamtx.dev.yml
+#   ./mediamtx mediamtx.dev.yml
+#
+# Xem docs/camera-management-dev.md để tải binary + chạy đầy đủ.
+# Chỉ đặt các key khác mặc định của MediaMTX v1.20.0.
+
+logLevel: info
+
+# Dev harness chạy trên máy cá nhân: bind TẤT CẢ về loopback. Mặc định của
+# MediaMTX là 0.0.0.0 + cho đọc/publish nặc danh — để nguyên là cả LAN xem
+# được camera và đẩy stream đè path. Production (Phase 2) mở ra sau nginx+auth.
+rtspAddress: 127.0.0.1:8554
+hlsAddress: 127.0.0.1:8888
+webrtcAddress: 127.0.0.1:8889
+# Không dùng RTMP/SRT — tắt để khỏi mở cổng thừa.
+rtmp: no
+srt: no
+
+# Auth đọc luồng: HLS/WHEP yêu cầu viewer:pass (khớp MEDIA_VIEWER_* trong env
+# của dashboard) — kể cả khi request tới qua reverse proxy từ loopback, vì
+# 'any'-loopback dưới đây KHÔNG có quyền read. Loopback nặc danh chỉ được
+# publish (ffmpeg), api (Next), playback (Next proxy).
+authInternalUsers:
+  - user: viewer
+    pass: doi-mat-khau-nay
+    permissions:
+      - action: read
+  - user: any
+    ips: ["127.0.0.1", "::1"]
+    permissions:
+      - action: publish
+      - action: api
+      - action: playback
+
+# Control API cho /api/cameras (trạng thái path). Bind loopback — chỉ Next gọi.
+api: yes
+apiAddress: 127.0.0.1:9997
+
+# Playback server cho tính năng tua lại (/list + /get). Bind loopback — Next proxy.
+playback: yes
+playbackAddress: 127.0.0.1:9996
+
+# Giữ HLS muxer chạy sẵn để lưới camera load tức thì (khỏi đợi remux khởi động).
+hlsAlwaysRemux: yes
+
+# Quảng bá loopback làm ICE candidate để trình duyệt cùng máy nối WebRTC được.
+# Production (Phase 2): thay bằng IP công khai của server media.
+webrtcAdditionalHosts: [127.0.0.1]
+
+pathDefaults:
+  # Ghi hình liên tục làm lớp NVR (nguồn được pull 24/7 vì KHÔNG bật
+  # sourceOnDemand). Playback server yêu cầu fmp4.
+  record: yes
+  recordPath: ./recordings/%path/%Y-%m-%d_%H-%M-%S-%f
+  recordFormat: fmp4
+  # Dev để 1m cho nhanh có nhiều segment mà thử tua; production dùng 10m.
+  recordSegmentDuration: 1m
+  # Dev dọn sau 24h; production chỉnh theo dung lượng đĩa thực tế.
+  recordDeleteAfter: 24h
+
+paths:
+  # Tên path PHẢI trùng `code` trong src/lib/aibox/cameras.ts.
+  cam01:
+    # Camera HEVC/H.265: trình duyệt không chơi được (WebRTC Chrome/Firefox
+    # không có HEVC, HLS HEVC chỉ Safari) nên ffmpeg transcode sang H.264 720p
+    # rồi đẩy ngược vào path này. Camera đã là H.264 thì bỏ runOnInit, dùng:
+    #   source: rtsp://user:pass@ip:port/duong-dan
+    # macOS dùng encoder cứng h264_videotoolbox; Linux (Phase 2) thay bằng:
+    #   -c:v libx264 -preset veryfast -tune zerolatency
+    # `-an` bỏ audio: giám sát không cần, và audio camera này timestamp hỏng.
+    # `-timeout 15000000` (15s, micro giây — option của demuxer RTSP, ffmpeg
+    # >=5): camera đứt mạng thì ffmpeg exit thay vì treo vô hạn, để
+    # runOnInitRestart kéo lại — thiếu flag này ghi hình chết im lặng khi
+    # camera rớt kết nối. Phải đặt TRƯỚC -i (áp cho input).
+    runOnInit: >
+      ffmpeg -nostdin -loglevel warning -rtsp_transport tcp -timeout 15000000
+      -i "rtsp://user:pass@camera-ip:554/duong-dan-stream"
+      -c:v h264_videotoolbox -realtime 1 -b:v 2500k -vf scale=1280:-2 -r 15 -g 30 -pix_fmt yuv420p
+      -an
+      -f rtsp -rtsp_transport tcp rtsp://localhost:$RTSP_PORT/$MTX_PATH
+    runOnInitRestart: yes

@@ -12,6 +12,13 @@ dist
 # Repo nay public nen giu file o local.
 docs/deploy-unique-visitor-worker.md
 
+# MediaMTX dev harness: config that RTSP credentials + video ghi hinh local.
+# Neo "/" dau dong: chi khop o goc repo, khong duoc nuot cac thu muc trung ten
+# trong src/ (vd src/app/api/cameras/[code]/recordings/).
+/mediamtx.dev.yml
+/recordings/
+/mediamtx
+
 # Python face-matching worker (venv + caches + runtime secret)
 .venv/
 __pycache__/

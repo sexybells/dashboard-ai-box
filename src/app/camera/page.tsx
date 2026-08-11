@@ -1,5 +1,5 @@
-import { CameraEmbed } from "@/components/camera-embed";
+import { CameraView } from "@/components/camera/camera-view";
 
 export default function CameraPage() {
-  return <CameraEmbed />;
+  return <CameraView />;
 }

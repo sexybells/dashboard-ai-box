@@ -3,13 +3,8 @@
 import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HlsPlayer } from "@/components/camera/hls-player";
+import { useLiveUrls } from "@/components/camera/use-live-urls";
 import { WebrtcPlayer } from "@/components/camera/webrtc-player";
-import {
-  buildHlsLiveUrl,
-  buildWhepUrl,
-  publicHlsBase,
-  publicWebrtcBase
-} from "@/lib/aibox/media-endpoints";
 import { cn } from "@/lib/cn";
 import type { CameraListItem } from "@/services/camera-client";
 
@@ -34,6 +29,7 @@ interface CameraSingleViewProps {
 
 export function CameraSingleView({ camera, onBack }: CameraSingleViewProps) {
   const [transport, setTransport] = useState<"webrtc" | "hls">("webrtc");
+  const { live, error: liveError } = useLiveUrls(camera.code);
   const errorCount = useRef(0);
   const connected = useRef(false);
 
@@ -50,13 +46,14 @@ export function CameraSingleView({ camera, onBack }: CameraSingleViewProps) {
   }, []);
 
   // Chốt chặn cuối cho fallback: hết hạn mà chưa từng nhận track → HLS.
+  // Chỉ đếm giờ khi đã có URL (live) — kẻo trừ oan thời gian chờ /live.
   useEffect(() => {
-    if (transport !== "webrtc" || !camera.online) return;
+    if (transport !== "webrtc" || !camera.online || !live) return;
     const timer = setTimeout(() => {
       if (!connected.current) setTransport("hls");
     }, WEBRTC_CONNECT_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [transport, camera.online]);
+  }, [transport, camera.online, live]);
 
   return (
     <div className="space-y-3">
@@ -88,19 +85,22 @@ export function CameraSingleView({ camera, onBack }: CameraSingleViewProps) {
           <div className="flex size-full items-center justify-center">
             <p className="text-sm text-muted-foreground">Camera mất kết nối</p>
           </div>
+        ) : !live ? (
+          <div className="flex size-full items-center justify-center">
+            <p className="text-sm text-muted-foreground">
+              {liveError ? "Không tải được cấu hình luồng" : "Đang tải…"}
+            </p>
+          </div>
         ) : transport === "webrtc" ? (
           <WebrtcPlayer
-            whepUrl={buildWhepUrl(publicWebrtcBase(), camera.code)}
+            whepUrl={live.webrtc}
+            auth={live.auth}
             onError={handleWebrtcError}
             onConnected={handleConnected}
             className="size-full"
           />
         ) : (
-          <HlsPlayer
-            src={buildHlsLiveUrl(publicHlsBase(), camera.code)}
-            muted={false}
-            className="size-full"
-          />
+          <HlsPlayer src={live.hls} auth={live.auth} muted={false} className="size-full" />
         )}
       </div>
     </div>

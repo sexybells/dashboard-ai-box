@@ -19,6 +19,22 @@ webrtcAddress: 127.0.0.1:8889
 rtmp: no
 srt: no
 
+# Auth đọc luồng: HLS/WHEP yêu cầu viewer:pass (khớp MEDIA_VIEWER_* trong env
+# của dashboard) — kể cả khi request tới qua reverse proxy từ loopback, vì
+# 'any'-loopback dưới đây KHÔNG có quyền read. Loopback nặc danh chỉ được
+# publish (ffmpeg), api (Next), playback (Next proxy).
+authInternalUsers:
+  - user: viewer
+    pass: doi-mat-khau-nay
+    permissions:
+      - action: read
+  - user: any
+    ips: ["127.0.0.1", "::1"]
+    permissions:
+      - action: publish
+      - action: api
+      - action: playback
+
 # Control API cho /api/cameras (trạng thái path). Bind loopback — chỉ Next gọi.
 api: yes
 apiAddress: 127.0.0.1:9997

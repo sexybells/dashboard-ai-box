@@ -10,6 +10,8 @@ import { cn } from "@/lib/cn";
 
 interface HlsPlayerProps {
   src: string;
+  /** Creds đọc luồng MediaMTX (Basic) — production bật auth trên media origin. */
+  auth?: { user: string; pass: string } | null;
   /** Grid tile phải muted để trình duyệt cho autoplay. */
   muted?: boolean;
   className?: string;
@@ -17,7 +19,7 @@ interface HlsPlayerProps {
   onError?: (message: string) => void;
 }
 
-export function HlsPlayer({ src, muted = true, className, onError }: HlsPlayerProps) {
+export function HlsPlayer({ src, auth = null, muted = true, className, onError }: HlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -26,8 +28,10 @@ export function HlsPlayer({ src, muted = true, className, onError }: HlsPlayerPr
     if (!video || !src) return;
     setFailed(null);
 
-    // Safari: HLS native, không cần hls.js.
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    // Safari: HLS native, không cần hls.js — nhưng CHỈ khi không cần auth
+    // (video src không gắn được header Authorization). Có auth thì Safari
+    // desktop/iOS 17.1+ vẫn đi nhánh hls.js bên dưới nhờ MSE.
+    if (!auth && video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = src;
       return () => {
         video.removeAttribute("src");
@@ -45,7 +49,19 @@ export function HlsPlayer({ src, muted = true, className, onError }: HlsPlayerPr
       return;
     }
 
-    const hls = new Hls({ lowLatencyMode: true });
+    const hls = new Hls({
+      lowLatencyMode: true,
+      // Gắn Basic auth cho MỌI request (playlist + segment) khi media origin
+      // bật auth. MediaMTX cấp cookie phiên sau request đầu nhưng gắn đều
+      // header cho chắc, khỏi phụ thuộc hành vi cookie.
+      ...(auth
+        ? {
+            xhrSetup: (xhr: XMLHttpRequest) => {
+              xhr.setRequestHeader("Authorization", `Basic ${btoa(`${auth.user}:${auth.pass}`)}`);
+            }
+          }
+        : {})
+    });
     hls.loadSource(src);
     hls.attachMedia(video);
     hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -68,7 +84,7 @@ export function HlsPlayer({ src, muted = true, className, onError }: HlsPlayerPr
     return () => {
       hls.destroy();
     };
-  }, [src, onError]);
+  }, [src, auth, onError]);
 
   return (
     <div className={cn("relative overflow-hidden bg-black", className)}>

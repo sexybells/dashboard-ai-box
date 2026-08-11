@@ -22,6 +22,8 @@ export async function fetchCameras(): Promise<CameraListItem[]> {
 export interface CameraLiveUrls {
   hls: string;
   webrtc: string;
+  /** Creds đọc luồng MediaMTX (Basic) — null khi môi trường không bật auth. */
+  auth: { user: string; pass: string } | null;
 }
 
 export async function fetchCameraLiveUrls(code: string): Promise<CameraLiveUrls> {
@@ -32,7 +34,7 @@ export async function fetchCameraLiveUrls(code: string): Promise<CameraLiveUrls>
     throw new Error(`Failed to load live urls: ${response.status}`);
   }
   const data = (await response.json()) as { ok: boolean } & CameraLiveUrls;
-  return { hls: data.hls, webrtc: data.webrtc };
+  return { hls: data.hls, webrtc: data.webrtc, auth: data.auth ?? null };
 }
 
 /** Các khoảng đã ghi trong [from, to] — đầu vào cho recording-timeline. */

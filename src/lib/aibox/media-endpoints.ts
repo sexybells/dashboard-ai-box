@@ -87,3 +87,21 @@ export function publicHlsBase(): string {
 export function publicWebrtcBase(): string {
   return stripTrailingSlash(process.env.NEXT_PUBLIC_MEDIA_WEBRTC_BASE || DEFAULT_MEDIA_WEBRTC_BASE);
 }
+
+export interface MediaViewerAuth {
+  user: string;
+  pass: string;
+}
+
+/**
+ * Tài khoản đọc luồng media (authInternalUsers của MediaMTX, action: read).
+ * Server-side only — trả cho client qua endpoint /live (đã cookie-auth),
+ * KHÔNG dùng NEXT_PUBLIC để khỏi nướng creds vào bundle. Không đặt env
+ * (dev không bật auth) thì trả null, player bỏ qua bước gắn creds.
+ */
+export function mediaViewerAuth(): MediaViewerAuth | null {
+  const user = process.env.MEDIA_VIEWER_USER;
+  const pass = process.env.MEDIA_VIEWER_PASS;
+  if (!user || !pass) return null;
+  return { user, pass };
+}

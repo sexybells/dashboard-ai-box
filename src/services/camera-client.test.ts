@@ -28,12 +28,24 @@ describe("camera client fetchers", () => {
     expect(fn).toHaveBeenCalledWith("/api/cameras", { cache: "no-store" });
   });
 
-  it("fetchCameraLiveUrls unwraps hls + webrtc", async () => {
-    mockFetchOnce({ ok: true, hls: "http://h/x.m3u8", webrtc: "http://w/whep" });
+  it("fetchCameraLiveUrls unwraps hls + webrtc + auth", async () => {
+    mockFetchOnce({
+      ok: true,
+      hls: "http://h/x.m3u8",
+      webrtc: "http://w/whep",
+      auth: { user: "viewer", pass: "x" }
+    });
     await expect(fetchCameraLiveUrls("cam01")).resolves.toEqual({
       hls: "http://h/x.m3u8",
-      webrtc: "http://w/whep"
+      webrtc: "http://w/whep",
+      auth: { user: "viewer", pass: "x" }
     });
+  });
+
+  it("fetchCameraLiveUrls defaults auth to null when the API omits it", async () => {
+    mockFetchOnce({ ok: true, hls: "http://h/x.m3u8", webrtc: "http://w/whep" });
+    const live = await fetchCameraLiveUrls("cam01");
+    expect(live.auth).toBeNull();
   });
 
   it("fetchRecordingRanges unwraps ranges and sends the window as ISO params", async () => {

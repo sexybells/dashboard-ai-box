@@ -10,6 +10,8 @@ import { cn } from "@/lib/cn";
 
 interface WebrtcPlayerProps {
   whepUrl: string;
+  /** Creds đọc luồng MediaMTX (Basic) — reader WHEP hỗ trợ sẵn user/pass. */
+  auth?: { user: string; pass: string } | null;
   className?: string;
   /** Gọi mỗi lần reader báo lỗi (kể cả lỗi tạm thời trước khi retry). */
   onError?: (message: string) => void;
@@ -17,7 +19,7 @@ interface WebrtcPlayerProps {
   onConnected?: () => void;
 }
 
-export function WebrtcPlayer({ whepUrl, className, onError, onConnected }: WebrtcPlayerProps) {
+export function WebrtcPlayer({ whepUrl, auth = null, className, onError, onConnected }: WebrtcPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [connecting, setConnecting] = useState(true);
 
@@ -38,6 +40,8 @@ export function WebrtcPlayer({ whepUrl, className, onError, onConnected }: Webrt
 
     const reader = new MediaMTXWebRTCReader({
       url: whepUrl,
+      user: auth?.user,
+      pass: auth?.pass,
       onTrack: (evt) => {
         setConnecting(false);
         video.srcObject = evt.streams[0];
@@ -53,7 +57,7 @@ export function WebrtcPlayer({ whepUrl, className, onError, onConnected }: Webrt
       reader.close();
       video.srcObject = null;
     };
-  }, [whepUrl]);
+  }, [whepUrl, auth]);
 
   return (
     <div className={cn("relative overflow-hidden bg-black", className)}>

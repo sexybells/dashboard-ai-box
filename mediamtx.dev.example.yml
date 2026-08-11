@@ -9,6 +9,16 @@
 
 logLevel: info
 
+# Dev harness chạy trên máy cá nhân: bind TẤT CẢ về loopback. Mặc định của
+# MediaMTX là 0.0.0.0 + cho đọc/publish nặc danh — để nguyên là cả LAN xem
+# được camera và đẩy stream đè path. Production (Phase 2) mở ra sau nginx+auth.
+rtspAddress: 127.0.0.1:8554
+hlsAddress: 127.0.0.1:8888
+webrtcAddress: 127.0.0.1:8889
+# Không dùng RTMP/SRT — tắt để khỏi mở cổng thừa.
+rtmp: no
+srt: no
+
 # Control API cho /api/cameras (trạng thái path). Bind loopback — chỉ Next gọi.
 api: yes
 apiAddress: 127.0.0.1:9997

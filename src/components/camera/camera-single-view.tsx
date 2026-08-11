@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { HlsPlayer } from "@/components/camera/hls-player";
 import { WebrtcPlayer } from "@/components/camera/webrtc-player";
 import {
@@ -19,6 +19,13 @@ import type { CameraListItem } from "@/services/camera-client";
 // lại mà chưa từng nhận track nào.
 
 const WEBRTC_ERRORS_BEFORE_FALLBACK = 2;
+
+/**
+ * Reader WHEP có một đường chết hẳn không retry (lỗi ngay lúc dò codec) — khi
+ * đó onError chỉ bắn 1 lần, không bao giờ đủ ngưỡng đếm lỗi ở trên. Chốt chặn
+ * cuối: quá hạn này chưa nhận track nào thì ép chuyển HLS.
+ */
+const WEBRTC_CONNECT_TIMEOUT_MS = 8000;
 
 interface CameraSingleViewProps {
   camera: CameraListItem;
@@ -41,6 +48,15 @@ export function CameraSingleView({ camera, onBack }: CameraSingleViewProps) {
   const handleConnected = useCallback(() => {
     connected.current = true;
   }, []);
+
+  // Chốt chặn cuối cho fallback: hết hạn mà chưa từng nhận track → HLS.
+  useEffect(() => {
+    if (transport !== "webrtc" || !camera.online) return;
+    const timer = setTimeout(() => {
+      if (!connected.current) setTransport("hls");
+    }, WEBRTC_CONNECT_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [transport, camera.online]);
 
   return (
     <div className="space-y-3">

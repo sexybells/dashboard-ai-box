@@ -39,16 +39,31 @@ files but Mongo docs wouldn't follow) that the handoff itself flagged as unsolve
 ## Architecture
 
 ```
-Camera RTSP ──▶ MediaMTX ──┬─ HLS      :8888   (grid live, hls.js)
-                           ├─ WebRTC   :8889   (single-cam live, WHEP)
-                           ├─ Playback :9996   (/list, /get)  [127.0.0.1]
-                           ├─ API      :9997   (path status)  [127.0.0.1]
-                           └─ Recording → disk (fmp4, 10-min segments)
+Camera RTSP (HEVC) ─▶ ffmpeg transcode ─▶ MediaMTX path cam01 (H.264 720p)
+                       (H.264, videotoolbox/                │
+                        libx264, downscale 720p)            ├─ HLS      :8888  (grid live, hls.js)
+                                                            ├─ WebRTC   :8889  (single-cam, WHEP)
+                                                            ├─ Playback :9996  (/list, /get) [127.0.0.1]
+                                                            ├─ API      :9997  (path status)  [127.0.0.1]
+                                                            └─ Recording → disk (fmp4 segments)
 
 Browser ──▶ Next.js app
               ├─ control plane: /api/cameras/* proxy 9996/9997 (cookie-auth)
               └─ media plane:   HLS/WebRTC loaded from NEXT_PUBLIC_* origin
 ```
+
+### Transcoding (HEVC → H.264) — required
+
+The real camera streams **HEVC/H.265** (verified via ffprobe: 2304×1296@15, path label
+"h264" is misleading). HEVC is not usable across browsers: **WebRTC carries no HEVC in
+Chrome/Firefox**, and HLS/`<video>` HEVC only plays on Safari or machines with hardware
+HEVC decode. MediaMTX does not transcode. So each camera path runs an **ffmpeg** step
+(via MediaMTX `runOnInit`, restart on exit) that decodes HEVC, encodes **H.264**,
+downscales to **1280×720@15** (plenty for monitoring; light on CPU/disk/bandwidth), drops
+audio (`-an` — not needed, and the camera's audio timestamps are non-monotonic), and
+republishes into the same path. Everything downstream (HLS, WebRTC, recording, playback)
+is then H.264 and plays everywhere. Dev encoder: `h264_videotoolbox` (HW). Prod:
+`libx264 -preset veryfast`. This adds real CPU cost to size for in Phase 2.
 
 **Two planes.** The *control plane* (camera list, recording ranges, playback bytes)
 flows through authenticated Next.js API routes that proxy MediaMTX's ports, which bind
@@ -66,6 +81,20 @@ origin in Phase 2.
   re-requesting with a new `start`. All params URL-encoded.
 
 Sources: https://mediamtx.org/docs/usage/playback , https://mediamtx.org/docs/features/playback
+
+### Verified endpoints (MediaMTX v1.20.0, tested against a live instance)
+
+- **Camera status:** `GET :9997/v3/paths/list` → `{ items: [{ name, ready, online, tracks, ... }] }`.
+  Use `ready` as the online signal.
+- **HLS live:** `http://<host>:8888/<code>/index.m3u8` (multivariant; issues a one-time
+  `?cookieCheck=1` redirect). hls.js on Chrome/Firefox, native `<video>` on Safari.
+- **WebRTC live (WHEP):** endpoint `http://<host>:8889/<code>/whep`. The viewer flow (OPTIONS
+  for ICE servers via `Link` header → recvonly transceivers → POST offer `application/sdp`
+  → 201 answer + `Location` → trickle ICE via PATCH) is non-trivial, so we **vendor
+  MediaMTX's official `MediaMTXWebRTCReader`** class (MIT, served at `:8889/<code>/reader.js`)
+  as `src/lib/aibox/webrtc-whep-reader.ts` and wrap it in React. Public API:
+  `new Reader({ url, onTrack, onError })` + `.close()`.
+- **Playback:** `:9996/list` and `:9996/get` as above.
 
 ## Data & config — no new Mongo collection
 
@@ -126,8 +155,8 @@ NEXT_PUBLIC_MEDIA_WEBRTC_BASE=http://localhost:8889
 
 Components (kebab-case, `src/components/camera/`):
 
-- `hls-player.tsx` — reusable `<video>` + hls.js attach/detach (Safari plays HLS natively)
-- `webrtc-player.tsx` — vanilla WHEP client (`RTCPeerConnection` + `fetch` to `<webrtc>/whep`); no dependency
+- `hls-player.tsx` — reusable `<video>` + hls.js attach/detach (Safari plays HLS natively); `hls.destroy()` on unmount (React 19 StrictMode double-mount)
+- `webrtc-player.tsx` — wraps the vendored `webrtc-whep-reader.ts`; `.close()` on unmount
 - `camera-grid.tsx`, `camera-single-view.tsx`, `playback-view.tsx`, `recording-timeline.tsx`
 
 Service: `src/services/camera-client.ts` — typed fetchers for `/api/cameras` and
@@ -157,7 +186,7 @@ Following the repo's `src/lib/aibox/*` + `*.test.ts` convention:
 ## Local verification harness (Phase 1)
 
 - `mediamtx.dev.yml` (not the prod config) pulling the real public camera
-  `rtsp://…@222.252.47.115:3000/h264/ch1/main/av_stream` — reachable from the dev
+  (RTSP URL thật nằm trong `mediamtx.dev.yml`, gitignored) — reachable from the dev
   machine — into path `cam01`, recording fmp4 to a **gitignored** local dir.
 - MediaMTX binary is downloaded, not committed (documented run command).
 - Verify: grid shows live; single-cam WebRTC plays; recordings accrue on disk;

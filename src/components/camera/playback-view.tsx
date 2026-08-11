@@ -38,6 +38,9 @@ export function PlaybackView({ cameras }: PlaybackViewProps) {
   const [playback, setPlayback] = useState<PlaybackWindow | null>(null);
   const [cursor, setCursor] = useState<Date | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  // Số thứ tự request: response về trễ của camera/ngày cũ bị bỏ, không đè
+  // timeline hiện tại (đổi cam nhanh khi /list của MediaMTX đang chậm).
+  const requestSeq = useRef(0);
 
   // <input type=date> trả YYYY-MM-DD; new Date("...T00:00:00") = 0h LOCAL —
   // đúng ngày theo múi giờ người xem, khớp nhãn giờ trên thanh tua.
@@ -51,24 +54,34 @@ export function PlaybackView({ cameras }: PlaybackViewProps) {
 
   const loadRanges = useCallback(async () => {
     if (!code) return;
+    const seq = ++requestSeq.current;
     setError(null);
     try {
-      setRangesRaw(await fetchRecordingRanges(code, { from: viewStart, to: viewEnd }));
+      const ranges = await fetchRecordingRanges(code, { from: viewStart, to: viewEnd });
+      if (seq !== requestSeq.current) return; // đã có request mới hơn → bỏ
+      setRangesRaw(ranges);
     } catch {
+      if (seq !== requestSeq.current) return;
       setRangesRaw(null);
       setError("Không tải được danh sách ghi hình");
     }
   }, [code, viewStart, viewEnd]);
 
+  // Đổi camera/ngày → tải khoảng ghi hình mới (dừng phát đã làm ngay trong
+  // onChange để không có render nào ghép code mới với cửa sổ phát cũ).
   useEffect(() => {
-    // Đổi camera/ngày: dừng phát cũ rồi tải khoảng ghi hình mới. (IIFE để
-    // không setState đồng bộ ngay trong thân effect — cùng mẫu footfall-view.)
     void (async () => {
-      setPlayback(null);
-      setCursor(null);
       await loadRanges();
     })();
   }, [loadRanges]);
+
+  /** Reset trạng thái phát — gọi ngay khi đổi camera/ngày. */
+  const resetPlayback = useCallback(() => {
+    setPlayback(null);
+    setCursor(null);
+    setError(null);
+    setRangesRaw(null);
+  }, []);
 
   const seekTo = useCallback(
     (target: Date) => {
@@ -109,7 +122,10 @@ export function PlaybackView({ cameras }: PlaybackViewProps) {
       <div className="flex flex-wrap items-center gap-2">
         <select
           value={code}
-          onChange={(e) => setCode(e.target.value)}
+          onChange={(e) => {
+            resetPlayback();
+            setCode(e.target.value);
+          }}
           className="h-9 rounded-md border border-border bg-background px-2 text-sm"
         >
           {cameras.map((cam) => (
@@ -122,7 +138,11 @@ export function PlaybackView({ cameras }: PlaybackViewProps) {
           type="date"
           value={day}
           max={todayKey()}
-          onChange={(e) => e.target.value && setDay(e.target.value)}
+          onChange={(e) => {
+            if (!e.target.value) return;
+            resetPlayback();
+            setDay(e.target.value);
+          }}
           className="h-9 rounded-md border border-border bg-background px-2 text-sm"
         />
         <button
@@ -152,6 +172,13 @@ export function PlaybackView({ cameras }: PlaybackViewProps) {
             playsInline
             onTimeUpdate={handleTimeUpdate}
             onEnded={handleEnded}
+            onError={() => {
+              // /get lỗi (segment đã bị dọn theo retention, hở đúng chỗ hàn,
+              // MediaMTX sập giữa chừng) → video bắn error chứ không ended.
+              // Không xử lý thì màn đen đứng im không thông báo.
+              setPlayback(null);
+              setError("Không phát được đoạn ghi hình này — thử bấm mốc khác trên thanh thời gian");
+            }}
             className="size-full object-contain"
           />
         ) : (

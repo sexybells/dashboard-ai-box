@@ -53,6 +53,17 @@ describe("media-endpoints", () => {
     );
   });
 
+  it("builds /get url without format (nhánh production dùng)", () => {
+    const url = buildPlaybackGetUrl("http://127.0.0.1:9996", {
+      path: "cam01",
+      start: new Date("2026-08-11T10:00:00.000Z"),
+      duration: 183.009
+    });
+    expect(url).toBe(
+      "http://127.0.0.1:9996/get?path=cam01&start=2026-08-11T10%3A00%3A00.000Z&duration=183.009"
+    );
+  });
+
   it("builds /get url with duration and format", () => {
     const url = buildPlaybackGetUrl("http://127.0.0.1:9996", {
       path: "cam01",

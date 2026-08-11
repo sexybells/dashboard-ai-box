@@ -73,6 +73,24 @@ describe("mergeRanges", () => {
     expect(merged[0].end.getTime()).toBe(at(100).getTime());
   });
 
+  it("merges at exactly the tolerance boundary, splits just past it", () => {
+    // Hở đúng MERGE_TOLERANCE_SEC (2s) → vẫn hàn; quá 1ms → tách.
+    const atBoundary = mergeRanges(
+      parseRecordingRanges([
+        { start: T0, duration: 60 },
+        { start: at(62).toISOString(), duration: 60 }
+      ])
+    );
+    expect(atBoundary).toHaveLength(1);
+    const pastBoundary = mergeRanges(
+      parseRecordingRanges([
+        { start: T0, duration: 60 },
+        { start: at(62.001).toISOString(), duration: 60 }
+      ])
+    );
+    expect(pastBoundary).toHaveLength(2);
+  });
+
   it("does not mutate its input", () => {
     const ranges = parseRecordingRanges(RAW);
     const endBefore = ranges[0].end.getTime();
@@ -118,6 +136,11 @@ describe("findRangeAt", () => {
   it("end is exclusive", () => {
     expect(findRangeAt(merged, at(120.5))).toBeUndefined();
     expect(findRangeAt(merged, at(120.4))).toBe(merged[0]);
+  });
+
+  it("start is inclusive", () => {
+    expect(findRangeAt(merged, at(0))).toBe(merged[0]);
+    expect(findRangeAt(merged, at(720))).toBe(merged[1]);
   });
 });
 

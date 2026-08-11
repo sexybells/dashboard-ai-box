@@ -7,11 +7,15 @@
 // - media plane:   trình duyệt tải HLS/WebRTC trực tiếp từ
 //   NEXT_PUBLIC_MEDIA_HLS_BASE / NEXT_PUBLIC_MEDIA_WEBRTC_BASE.
 
-/** Mặc định dev: MediaMTX chạy cùng máy với dashboard. */
+/**
+ * Mặc định dev: MediaMTX chạy cùng máy với dashboard. Dùng 127.0.0.1 thay vì
+ * "localhost": Chrome ưu tiên phân giải localhost → ::1 (IPv6) trong khi
+ * MediaMTX dev bind 127.0.0.1 (IPv4) → ERR_CONNECTION_REFUSED.
+ */
 export const DEFAULT_MEDIAMTX_API_URL = "http://127.0.0.1:9997";
 export const DEFAULT_MEDIAMTX_PLAYBACK_URL = "http://127.0.0.1:9996";
-export const DEFAULT_MEDIA_HLS_BASE = "http://localhost:8888";
-export const DEFAULT_MEDIA_WEBRTC_BASE = "http://localhost:8889";
+export const DEFAULT_MEDIA_HLS_BASE = "http://127.0.0.1:8888";
+export const DEFAULT_MEDIA_WEBRTC_BASE = "http://127.0.0.1:8889";
 
 /** Bỏ dấu "/" cuối để ghép path không bị "//". */
 function stripTrailingSlash(base: string): string {

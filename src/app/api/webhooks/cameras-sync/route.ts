@@ -1,9 +1,19 @@
 import { reconcileCameraPaths } from "@/lib/aibox/mediamtx-paths";
 import { connectMongo } from "@/lib/mongodb";
 import { CameraModel } from "@/models/camera";
+import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+
+/** So sánh token theo thời gian hằng để không rò độ dài/khớp qua timing. */
+function tokenMatches(provided: string | null, expected: string): boolean {
+  if (!provided) return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
 
 /**
  * POST /api/webhooks/cameras-sync — cron trên server gọi mỗi phút (curl
@@ -20,7 +30,7 @@ export async function POST(request: NextRequest) {
   if (!expected) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
-  if (request.headers.get("x-sync-token") !== expected) {
+  if (!tokenMatches(request.headers.get("x-sync-token"), expected)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 

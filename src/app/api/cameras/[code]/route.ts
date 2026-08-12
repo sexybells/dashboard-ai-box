@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 
 const updateSchema = z.object({
   name: z.string().trim().min(1, "Thiếu tên camera").max(80),
-  rtspUrl: z.string().trim().min(1, "Thiếu link RTSP"),
+  rtspUrl: z.string().trim().min(1, "Thiếu link RTSP").max(2048, "Link RTSP quá dài"),
   location: z.string().trim().max(120).optional()
 });
 

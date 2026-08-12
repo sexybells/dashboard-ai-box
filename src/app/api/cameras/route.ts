@@ -1,6 +1,6 @@
 import { nextCameraCode, normalizeRtspUrl } from "@/lib/aibox/cameras";
 import { mediamtxApiUrl } from "@/lib/aibox/media-endpoints";
-import { deleteCameraPath, ensureCameraPath, reconcileCameraPaths } from "@/lib/aibox/mediamtx-paths";
+import { deleteCameraPath, ensureCameraPath } from "@/lib/aibox/mediamtx-paths";
 import { connectMongo } from "@/lib/mongodb";
 import { CameraModel } from "@/models/camera";
 import { NextRequest, NextResponse } from "next/server";
@@ -34,9 +34,10 @@ async function fetchReadyByName(): Promise<Map<string, boolean>> {
 }
 
 /**
- * GET /api/cameras — danh sách camera từ Mongo kèm trạng thái online, đồng
- * thời reconcile path MediaMTX theo Mongo (tự chữa sau khi MediaMTX restart —
- * cron cameras-sync là lưới đỡ chính, đây là lớp phụ mỗi lần mở trang).
+ * GET /api/cameras — danh sách camera từ Mongo kèm trạng thái online. Đọc
+ * thuần, không đụng cấu hình MediaMTX: việc đồng bộ path (kể cả tự chữa sau
+ * khi MediaMTX restart) do cron POST /api/webhooks/cameras-sync đảm nhiệm, nên
+ * trang này gọi liên tục (poll 30s, nhiều tab) cũng không sinh ghi cấu hình.
  * `rtspUrl` trả kèm cho form sửa (dashboard 1 admin, cookie-auth + HTTPS).
  */
 export async function GET() {
@@ -44,12 +45,6 @@ export async function GET() {
   const docs = await CameraModel.find({}, { code: 1, name: 1, location: 1, rtspUrl: 1 })
     .sort({ code: 1 })
     .lean<{ code: string; name: string; location?: string; rtspUrl: string }[]>();
-
-  try {
-    await reconcileCameraPaths(docs.map((d) => ({ code: d.code, rtspUrl: d.rtspUrl })));
-  } catch {
-    // MediaMTX sập — vẫn trả danh sách, online=false hết.
-  }
 
   const readyByName = await fetchReadyByName();
   const cameras = docs.map((d) => ({
@@ -65,7 +60,7 @@ export async function GET() {
 
 const createSchema = z.object({
   name: z.string().trim().min(1, "Thiếu tên camera").max(80),
-  rtspUrl: z.string().trim().min(1, "Thiếu link RTSP"),
+  rtspUrl: z.string().trim().min(1, "Thiếu link RTSP").max(2048, "Link RTSP quá dài"),
   location: z.string().trim().max(120).optional()
 });
 
@@ -107,12 +102,25 @@ export async function POST(request: NextRequest) {
   );
   const code = nextCameraCode(codes);
 
-  const doc = await CameraModel.create({
-    code,
-    name: parsed.data.name,
-    location: parsed.data.location,
-    rtspUrl
-  });
+  let doc;
+  try {
+    doc = await CameraModel.create({
+      code,
+      name: parsed.data.name,
+      location: parsed.data.location,
+      rtspUrl
+    });
+  } catch (e) {
+    // Hai POST đồng thời có thể chọn trùng code (read-modify-write không khoá).
+    // Unique index chặn ghi trùng → báo lỗi sạch để người dùng bấm lại thay vì 500.
+    if (e && typeof e === "object" && "code" in e && (e as { code: number }).code === 11000) {
+      return NextResponse.json(
+        { ok: false, error: "Có thao tác thêm camera khác vừa chạy, vui lòng thử lại" },
+        { status: 409 }
+      );
+    }
+    throw e;
+  }
 
   try {
     await ensureCameraPath(code, rtspUrl);

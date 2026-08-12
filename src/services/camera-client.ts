@@ -8,6 +8,8 @@ export interface CameraListItem {
   name: string;
   location: string;
   online: boolean;
+  /** RTSP nguồn — chỉ dùng để đổ vào form sửa. */
+  rtspUrl?: string;
 }
 
 export async function fetchCameras(): Promise<CameraListItem[]> {
@@ -17,6 +19,53 @@ export async function fetchCameras(): Promise<CameraListItem[]> {
   }
   const data = (await response.json()) as { ok: boolean; cameras: CameraListItem[] };
   return data.cameras;
+}
+
+export interface CameraInput {
+  name: string;
+  rtspUrl: string;
+  location?: string;
+}
+
+/** Lỗi mang thông điệp tiếng Việt từ API để hiển thị thẳng trên form. */
+async function readError(response: Response, fallback: string): Promise<string> {
+  try {
+    const data = (await response.json()) as { error?: string };
+    return data.error ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function createCamera(input: CameraInput): Promise<CameraListItem> {
+  const response = await fetch("/api/cameras", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input)
+  });
+  if (!response.ok) {
+    throw new Error(await readError(response, "Không thêm được camera"));
+  }
+  const data = (await response.json()) as { camera: CameraListItem };
+  return data.camera;
+}
+
+export async function updateCamera(code: string, input: CameraInput): Promise<void> {
+  const response = await fetch(`/api/cameras/${encodeURIComponent(code)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input)
+  });
+  if (!response.ok) {
+    throw new Error(await readError(response, "Không cập nhật được camera"));
+  }
+}
+
+export async function deleteCamera(code: string): Promise<void> {
+  const response = await fetch(`/api/cameras/${encodeURIComponent(code)}`, { method: "DELETE" });
+  if (!response.ok) {
+    throw new Error(await readError(response, "Không xoá được camera"));
+  }
 }
 
 export interface CameraLiveUrls {

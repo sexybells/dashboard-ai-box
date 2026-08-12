@@ -10,6 +10,10 @@ describe("getAuthRouteDecision", () => {
     expect(getAuthRouteDecision({ pathname: "/api/webhooks/aibox", search: "", isAuthenticated: false })).toEqual({
       type: "allow"
     });
+    // cameras-sync công khai ở tầng middleware nhưng route tự gác bằng token.
+    expect(
+      getAuthRouteDecision({ pathname: "/api/webhooks/cameras-sync", search: "", isAuthenticated: false })
+    ).toEqual({ type: "allow" });
   });
 
   it("redirects unauthenticated page requests to login with a safe next path", () => {

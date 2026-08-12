@@ -1,4 +1,3 @@
-import { isKnownCameraCode } from "@/lib/aibox/cameras";
 import {
   buildHlsLiveUrl,
   buildWhepUrl,
@@ -6,6 +5,7 @@ import {
   publicHlsBase,
   publicWebrtcBase
 } from "@/lib/aibox/media-endpoints";
+import { cameraExists } from "@/services/camera-lookup";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -20,7 +20,7 @@ export const runtime = "nodejs";
 export async function GET(_request: Request, context: { params: Promise<{ code: string }> }) {
   const { code } = await context.params;
 
-  if (!isKnownCameraCode(code)) {
+  if (!(await cameraExists(code))) {
     return NextResponse.json({ ok: false, error: "Camera không tồn tại" }, { status: 404 });
   }
 

@@ -61,24 +61,13 @@ pathDefaults:
   # Dev dọn sau 24h; production chỉnh theo dung lượng đĩa thực tế.
   recordDeleteAfter: 24h
 
-paths:
-  # Tên path PHẢI trùng `code` trong src/lib/aibox/cameras.ts.
-  cam01:
-    # Camera HEVC/H.265: trình duyệt không chơi được (WebRTC Chrome/Firefox
-    # không có HEVC, HLS HEVC chỉ Safari) nên ffmpeg transcode sang H.264 720p
-    # rồi đẩy ngược vào path này. Camera đã là H.264 thì bỏ runOnInit, dùng:
-    #   source: rtsp://user:pass@ip:port/duong-dan
-    # macOS dùng encoder cứng h264_videotoolbox; Linux (Phase 2) thay bằng:
-    #   -c:v libx264 -preset veryfast -tune zerolatency
-    # `-an` bỏ audio: giám sát không cần, và audio camera này timestamp hỏng.
-    # `-timeout 15000000` (15s, micro giây — option của demuxer RTSP, ffmpeg
-    # >=5): camera đứt mạng thì ffmpeg exit thay vì treo vô hạn, để
-    # runOnInitRestart kéo lại — thiếu flag này ghi hình chết im lặng khi
-    # camera rớt kết nối. Phải đặt TRƯỚC -i (áp cho input).
-    runOnInit: >
-      ffmpeg -nostdin -loglevel warning -rtsp_transport tcp -timeout 15000000
-      -i "rtsp://user:pass@camera-ip:554/duong-dan-stream"
-      -c:v h264_videotoolbox -realtime 1 -b:v 2500k -vf scale=1280:-2 -r 15 -g 30 -pix_fmt yuv420p
-      -an
-      -f rtsp -rtsp_transport tcp rtsp://localhost:$RTSP_PORT/$MTX_PATH
-    runOnInitRestart: yes
+# KHÔNG khai báo path tĩnh: dashboard tự thêm/sửa/xoá path qua Control API
+# theo collection `cameras` trong Mongo (CRUD từ giao diện). Path thêm động
+# kế thừa pathDefaults ở trên nên vẫn ghi hình. Camera là HEVC vẫn dùng được
+# — mỗi camera được transcode sang H.264 720p bằng ffmpeg (encoder theo env
+# MEDIA_TRANSCODE_ENCODER: libx264 trên server, h264_videotoolbox trên macOS).
+#
+# Vì config qua API KHÔNG bền qua restart MediaMTX, đặt cron gọi
+# POST /api/webhooks/cameras-sync (kèm header x-sync-token = CAMERA_SYNC_TOKEN)
+# mỗi phút để tự nạp lại path sau khi MediaMTX/khởi động lại.
+paths: {}

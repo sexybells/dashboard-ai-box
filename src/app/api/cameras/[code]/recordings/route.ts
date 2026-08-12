@@ -1,5 +1,5 @@
-import { isKnownCameraCode } from "@/lib/aibox/cameras";
 import { buildPlaybackListUrl, mediamtxPlaybackUrl } from "@/lib/aibox/media-endpoints";
+import { cameraExists } from "@/services/camera-lookup";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -21,7 +21,7 @@ function parseDateParam(value: string | null): Date | undefined {
 export async function GET(request: NextRequest, context: { params: Promise<{ code: string }> }) {
   const { code } = await context.params;
 
-  if (!isKnownCameraCode(code)) {
+  if (!(await cameraExists(code))) {
     return NextResponse.json({ ok: false, error: "Camera không tồn tại" }, { status: 404 });
   }
 

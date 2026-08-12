@@ -14,8 +14,11 @@ Camera RTSP (HEVC) → ffmpeg transcode H.264 720p → MediaMTX path cam01
   └─ Ghi hình fmp4 → ./recordings/cam01/…
 ```
 
-Thêm/đổi camera = sửa `paths` trong `mediamtx.dev.yml` **và** `CAMERAS` trong
-`src/lib/aibox/cameras.ts` (code phải trùng tên path).
+Thêm/sửa/xoá camera **ngay trên giao diện** (tab Trực tiếp → ô "Thêm camera",
+hover tile để Sửa/Xoá). Không sửa `mediamtx.yml` hay code nữa: camera lưu trong
+Mongo collection `cameras`, dashboard tự đồng bộ path MediaMTX qua Control API.
+Mỗi camera server tự sinh mã `camNN` (= tên path). Vì config API không bền qua
+restart MediaMTX, cron gọi `POST /api/webhooks/cameras-sync` mỗi phút để nạp lại.
 
 ## Chạy lần đầu
 

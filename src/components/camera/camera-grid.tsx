@@ -61,18 +61,27 @@ export function CameraGrid({ cameras, onSelect }: CameraGridProps) {
     );
   }
 
-  // 1 cam chiếm hết khung; nhiều cam chia lưới 2-3 cột theo bề ngang.
-  const gridClass =
-    cameras.length === 1
-      ? "grid-cols-1"
-      : cameras.length <= 4
-        ? "grid-cols-1 sm:grid-cols-2"
-        : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3";
+  // Tường camera kiểu NVR: luôn là lưới ô nhỏ cố định (tối thiểu 2x2), camera
+  // thật phát live trong ô của nó, ô còn lại để trống chờ camera mới — thêm
+  // cam trong cameras.ts là tự lấp ô. <=4 cam đi lưới 2 cột, hơn thì 3 cột;
+  // số ô làm tròn đủ hàng để tường luôn vuông vắn.
+  const cols = cameras.length <= 4 ? 2 : 3;
+  const cellCount = Math.max(4, Math.ceil(cameras.length / cols) * cols);
+  const placeholders = cellCount - cameras.length;
 
   return (
-    <div className={cn("grid gap-4", gridClass)}>
+    <div className={cn("grid gap-3 sm:gap-4", cols === 2 ? "grid-cols-2" : "grid-cols-2 xl:grid-cols-3")}>
       {cameras.map((cam) => (
         <GridTile key={cam.code} cam={cam} onSelect={onSelect} />
+      ))}
+      {Array.from({ length: placeholders }, (_, i) => (
+        <div
+          key={`empty-${i}`}
+          className="flex aspect-video flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border/70 bg-muted/20"
+        >
+          <VideoOff className="size-5 text-muted-foreground/50" />
+          <p className="text-xs text-muted-foreground/60">Trống</p>
+        </div>
       ))}
     </div>
   );

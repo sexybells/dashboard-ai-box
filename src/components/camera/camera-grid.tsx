@@ -4,6 +4,7 @@ import { Maximize2, Pencil, Plus, Trash2, VideoOff } from "lucide-react";
 import { useState } from "react";
 import { EzvizPlayer } from "@/components/camera/ezviz-player";
 import { HlsPlayer } from "@/components/camera/hls-player";
+import { PtzPad } from "@/components/camera/ptz-pad";
 import { useLiveUrls } from "@/components/camera/use-live-urls";
 import { cn } from "@/lib/cn";
 import { deleteCamera, type CameraListItem } from "@/services/camera-client";
@@ -86,6 +87,16 @@ function GridTile({
       {cam.source === "ezviz" ? (
         <div className="aspect-video">
           <EzvizPlayer code={cam.code} kind="live" onVerifyCodeSaved={onChanged} />
+          {/*
+            Điều khiển xoay ngay trên ô, không bắt người dùng mở toàn khung.
+            Nút PTZ sẵn có của EZUIKit đã bị ẩn (tiếng Anh, trùng chức năng),
+            nên đây là lối điều khiển duy nhất ở màn hình lưới.
+          */}
+          {!cam.needsVerifyCode ? (
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 transition group-hover:opacity-100">
+              <PtzPad code={cam.code} compact />
+            </div>
+          ) : null}
         </div>
       ) : (
         <button

@@ -2,6 +2,7 @@
 
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Minus, Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/cn";
 import { sendPtz, type PtzDirection } from "@/services/ezviz-client";
 
 // Điều khiển PTZ. Quy tắc sống còn: MỌI đường thoát khỏi trạng thái "đang giữ"
@@ -29,7 +30,13 @@ const ZOOMS: { direction: PtzDirection; label: string; Icon: typeof Plus }[] = [
   { direction: 9, label: "Thu nhỏ", Icon: Minus }
 ];
 
-export function PtzPad({ code }: { code: string }) {
+interface PtzPadProps {
+  code: string;
+  /** Bản gọn để đặt đè lên ô camera trong lưới (ô nhỏ, nền là video). */
+  compact?: boolean;
+}
+
+export function PtzPad({ code, compact = false }: PtzPadProps) {
   const holding = useRef<PtzDirection | null>(null);
   /** Thời điểm gửi lệnh start, để biết đã xoay đủ lâu chưa. */
   const startedAt = useRef(0);
@@ -115,13 +122,20 @@ export function PtzPad({ code }: { code: string }) {
     };
   }, [stop]);
 
-  const buttonClass =
-    "flex size-10 items-center justify-center rounded-md border border-border bg-card text-foreground transition hover:bg-muted active:bg-brand active:text-white";
+  // Bản gọn nằm đè lên video nên cần nền tối và nút nhỏ hơn; bản thường nằm
+  // trong thẻ riêng dưới khung hình.
+  const buttonClass = compact
+    ? "flex size-7 items-center justify-center rounded-md bg-black/60 text-white transition hover:bg-black/80 active:bg-brand"
+    : "flex size-10 items-center justify-center rounded-md border border-border bg-card text-foreground transition hover:bg-muted active:bg-brand active:text-white";
+  const iconClass = compact ? "size-3.5" : "size-4";
 
   function holdProps(direction: PtzDirection) {
     return {
       onPointerDown: (e: React.PointerEvent) => {
         e.preventDefault();
+        // Ô camera trong lưới có thể nằm trong vùng bấm khác — đừng để lệnh
+        // xoay kéo theo hành vi của phần tử cha.
+        e.stopPropagation();
         start(direction);
       },
       onPointerUp: () => stop(),
@@ -131,7 +145,7 @@ export function PtzPad({ code }: { code: string }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-4">
+    <div className={cn("flex items-center", compact ? "flex-col gap-1" : "flex-wrap gap-4")}>
       <div className="grid grid-cols-3 grid-rows-3 gap-1">
         {DIRECTIONS.map(({ direction, label, Icon, cell }) => (
           <button
@@ -142,7 +156,7 @@ export function PtzPad({ code }: { code: string }) {
             className={`${buttonClass} ${cell}`}
             {...holdProps(direction)}
           >
-            <Icon className="size-4" />
+            <Icon className={iconClass} />
           </button>
         ))}
       </div>
@@ -157,12 +171,15 @@ export function PtzPad({ code }: { code: string }) {
             className={buttonClass}
             {...holdProps(direction)}
           >
-            <Icon className="size-4" />
+            <Icon className={iconClass} />
           </button>
         ))}
       </div>
 
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {error ? (
+        <p className={cn("text-destructive", compact ? "text-[10px]" : "text-xs")}>{error}</p>
+      ) : null}
     </div>
   );
+
 }

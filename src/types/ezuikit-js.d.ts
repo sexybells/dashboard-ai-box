@@ -24,6 +24,10 @@ declare module "ezuikit-js" {
     audio?: 0 | 1;
     /** Tự phát ngay khi khởi tạo (mặc định bật). */
     autoplay?: boolean;
+    /** Ngôn ngữ giao diện. CHỈ "zh" (mặc định) hoặc "en" — mã khác gây lỗi. */
+    language?: "zh" | "en";
+    /** Đè từ điển của các widget con, khoá ngoài cùng là mã ngôn ngữ. */
+    locales?: Record<string, Record<string, string>>;
     [key: string]: unknown;
   }
 

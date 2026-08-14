@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { EZUIKIT_LANGUAGE, EZUIKIT_LOCALES } from "@/components/camera/ezviz-locale";
 import { EzvizVerifyCodeDialog } from "@/components/camera/ezviz-verify-code-dialog";
 import { cn } from "@/lib/cn";
 import { EzvizPlayError, fetchEzvizPlaySource } from "@/services/ezviz-client";
@@ -118,7 +119,11 @@ export function EzvizPlayer({ code, kind, begin, className, onVerifyCodeSaved }:
           width: box.width,
           height: box.height,
           scaleMode: 1,
-          template: kind === "live" ? "pcLive" : "pcRec"
+          template: kind === "live" ? "pcLive" : "pcRec",
+          // Mặc định của thư viện là tiếng Trung. Xem ezviz-locale.ts để biết
+          // vì sao không đặt thẳng "vi" được.
+          language: EZUIKIT_LANGUAGE,
+          locales: EZUIKIT_LOCALES
         });
 
         if (cancelled) return;

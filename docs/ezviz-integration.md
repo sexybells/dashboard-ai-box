@@ -113,6 +113,23 @@ lúc khởi tạo dù tài liệu nói vậy. Bộ giải mã trả `nErrorCode 
 kiện rồi tự dừng chờ khoá; đường duy nhất nạp khoá là gọi `setSecretKey()` sau
 khi player đã vào trạng thái chờ. Chi tiết trong `src/components/camera/ezviz-player.tsx`.
 
+## Ngôn ngữ hiển thị của player
+
+Thư viện `ezuikit-js` mặc định hiển thị **tiếng Trung** và chỉ đóng gói sẵn hai
+từ điển: `zh` và `en`. **Không đặt `language: "vi"`** — i18n của player chính
+tra thẳng `translations[currentLanguage][key]` nên mã ngôn ngữ lạ sẽ ném lỗi
+ngay lần dịch đầu.
+
+Cấu hình đang dùng (`src/components/camera/ezviz-locale.ts`):
+
+- `language: "en"` để bỏ tiếng Trung.
+- `locales` đè tiếng Việt lên chính khoá `"en"`. Cách này ăn được vì các widget
+  con dựng i18n theo `merge(từ_điển_gốc, options.locales)`.
+
+Kết quả đo trên giao diện: quét toàn trang cả hai tab, **0 ký tự Trung**, kể cả
+trong `title` và `aria-label`. Muốn dịch thêm chuỗi nào thì thêm khoá vào
+`EZUIKIT_LOCALES`; khoá không tồn tại bị bỏ qua chứ không gây lỗi.
+
 ## Chế độ token tài khoản chính
 
 Mặc định dashboard chỉ phát bằng token **tài khoản con**. Tài khoản con của dự

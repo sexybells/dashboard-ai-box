@@ -40,20 +40,57 @@ async function fetchReadyByName(): Promise<Map<string, boolean>> {
  * trang này gọi liên tục (poll 30s, nhiều tab) cũng không sinh ghi cấu hình.
  * `rtspUrl` trả kèm cho form sửa (dashboard 1 admin, cookie-auth + HTTPS).
  */
+interface CameraLean {
+  code: string;
+  name: string;
+  location?: string;
+  source?: "rtsp" | "ezviz";
+  rtspUrl?: string;
+  ezvizSerial?: string;
+  ezvizVerifyCode?: string;
+  ezvizEncrypted?: boolean;
+  ezvizOnline?: boolean;
+  ezvizMissing?: boolean;
+}
+
 export async function GET() {
   await connectMongo();
-  const docs = await CameraModel.find({}, { code: 1, name: 1, location: 1, rtspUrl: 1 })
+  const docs = await CameraModel.find(
+    {},
+    {
+      code: 1,
+      name: 1,
+      location: 1,
+      source: 1,
+      rtspUrl: 1,
+      ezvizSerial: 1,
+      ezvizVerifyCode: 1,
+      ezvizEncrypted: 1,
+      ezvizOnline: 1,
+      ezvizMissing: 1
+    }
+  )
     .sort({ code: 1 })
-    .lean<{ code: string; name: string; location?: string; rtspUrl: string }[]>();
+    .lean<CameraLean[]>();
 
   const readyByName = await fetchReadyByName();
-  const cameras = docs.map((d) => ({
-    code: d.code,
-    name: d.name,
-    location: d.location ?? "",
-    rtspUrl: d.rtspUrl,
-    online: readyByName.get(d.code) ?? false
-  }));
+  const cameras = docs.map((d) => {
+    // Doc tạo trước khi có trường `source` mặc nhiên là camera RTSP.
+    const source = d.source ?? "rtsp";
+    return {
+      code: d.code,
+      name: d.name,
+      location: d.location ?? "",
+      source,
+      rtspUrl: d.rtspUrl,
+      ezvizSerial: d.ezvizSerial,
+      // Mã xác minh KHÔNG đi ra đây — chỉ route cấp URL phát mới dùng tới nó.
+      needsVerifyCode: source === "ezviz" && d.ezvizEncrypted === true && !d.ezvizVerifyCode,
+      ezvizMissing: d.ezvizMissing === true,
+      // Camera EZVIZ không có path MediaMTX; online lấy từ lần đồng bộ gần nhất.
+      online: source === "ezviz" ? (d.ezvizOnline ?? false) : (readyByName.get(d.code) ?? false)
+    };
+  });
 
   return NextResponse.json({ ok: true, cameras });
 }
@@ -108,6 +145,7 @@ export async function POST(request: NextRequest) {
       code,
       name: parsed.data.name,
       location: parsed.data.location,
+      source: "rtsp",
       rtspUrl
     });
   } catch (e) {
@@ -136,6 +174,13 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    camera: { code, name: doc.name, location: doc.location ?? "", rtspUrl, online: false }
+    camera: {
+      code,
+      name: doc.name,
+      location: doc.location ?? "",
+      source: "rtsp" as const,
+      rtspUrl,
+      online: false
+    }
   });
 }

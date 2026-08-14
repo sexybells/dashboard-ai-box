@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "apexcharts": "^5.16.0",
+    "ezuikit-js": "9.0.17",
     "geist": "^1.7.2",
     "hls.js": "^1.6.17",
     "lucide-react": "^1.24.0",

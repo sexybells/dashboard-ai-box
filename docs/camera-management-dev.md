@@ -1,5 +1,10 @@
 # Camera trực tiếp + tua lại — chạy dev harness
 
+> Tài liệu này nói về camera **RTSP qua MediaMTX**. Camera **EZVIZ** đi đường
+> khác hẳn (EZVIZ Cloud, không cần MediaMTX) — xem `docs/ezviz-integration.md`.
+> Trên server production MediaMTX hiện đang **tắt**, nên tab Trực tiếp chỉ có
+> camera EZVIZ; camera RTSP sẽ hiện offline cho tới khi bật lại MediaMTX.
+
 Tính năng camera (lưới trực tiếp, xem 1 cam WebRTC, tua lại NVR) cần **MediaMTX**
 chạy cạnh dashboard. Spec: `docs/superpowers/specs/2026-08-11-camera-management-playback-design.md`.
 

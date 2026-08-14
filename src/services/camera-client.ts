@@ -8,8 +8,15 @@ export interface CameraListItem {
   name: string;
   location: string;
   online: boolean;
+  /** "rtsp" phát qua MediaMTX, "ezviz" phát thẳng từ EZVIZ Cloud. */
+  source: "rtsp" | "ezviz";
   /** RTSP nguồn — chỉ dùng để đổ vào form sửa. */
   rtspUrl?: string;
+  ezvizSerial?: string;
+  /** Camera EZVIZ bật mã hoá nhưng chưa có mã xác minh → chưa phát được. */
+  needsVerifyCode?: boolean;
+  /** Serial không còn trong tài khoản EZVIZ (doc vẫn giữ). */
+  ezvizMissing?: boolean;
 }
 
 export async function fetchCameras(): Promise<CameraListItem[]> {

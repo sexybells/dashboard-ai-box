@@ -1,13 +1,16 @@
 "use client";
 
+import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CameraEmbed } from "@/components/camera-embed";
 import { CameraFormDialog } from "@/components/camera/camera-form-dialog";
 import { CameraGrid } from "@/components/camera/camera-grid";
 import { CameraSingleView } from "@/components/camera/camera-single-view";
+import { EzvizPlaybackView } from "@/components/camera/ezviz-playback-view";
 import { PlaybackView } from "@/components/camera/playback-view";
 import { cn } from "@/lib/cn";
 import { fetchCameras, type CameraListItem } from "@/services/camera-client";
+import { syncEzviz } from "@/services/ezviz-client";
 
 // Trang Camera 3 tab: Trực tiếp (tường NVR + CRUD → bấm 1 cam = WebRTC), Xem
 // lại (tua qua MediaMTX playback), Giao diện Box (iframe cũ). Chỉ mount tab
@@ -32,6 +35,8 @@ export function CameraView() {
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogState>({ mode: "closed" });
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const activeRef = useRef(true);
 
   const load = useCallback(async () => {
@@ -61,6 +66,26 @@ export function CameraView() {
   }, [load]);
 
   const selected = cameras?.find((c) => c.code === selectedCode) ?? null;
+  const ezvizCameras = cameras?.filter((c) => c.source === "ezviz") ?? [];
+  const rtspCameras = cameras?.filter((c) => c.source !== "ezviz") ?? [];
+
+  // Đồng bộ danh sách thiết bị từ tài khoản EZVIZ rồi tải lại lưới.
+  const runSync = useCallback(async () => {
+    setSyncing(true);
+    setSyncMessage(null);
+    try {
+      const result = await syncEzviz();
+      setSyncMessage(
+        `Đồng bộ xong: thêm ${result.added}, cập nhật ${result.updated}` +
+          (result.missing > 0 ? `, ${result.missing} thiết bị không còn trong tài khoản` : "")
+      );
+      await load();
+    } catch (e) {
+      setSyncMessage(e instanceof Error ? e.message : "Không đồng bộ được camera EZVIZ");
+    } finally {
+      setSyncing(false);
+    }
+  }, [load]);
 
   // Sau khi thêm/sửa/xoá: đóng dialog, thoát single-view (phòng khi cam đang
   // xem bị xoá), rồi tải lại danh sách.
@@ -88,7 +113,20 @@ export function CameraView() {
             {label}
           </button>
         ))}
+
+        <button
+          type="button"
+          onClick={() => void runSync()}
+          disabled={syncing}
+          title="Nạp danh sách camera từ tài khoản EZVIZ"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+        >
+          <RefreshCw className={cn("size-3.5", syncing && "animate-spin")} />
+          {syncing ? "Đang đồng bộ…" : "Đồng bộ EZVIZ"}
+        </button>
       </div>
+
+      {syncMessage ? <p className="text-sm text-muted-foreground">{syncMessage}</p> : null}
 
       {tab === "live" ? (
         cameras === null ? (
@@ -114,7 +152,21 @@ export function CameraView() {
             <p className="text-sm text-muted-foreground">{loadError ?? "Đang tải…"}</p>
           </div>
         ) : (
-          <PlaybackView cameras={cameras} />
+          <div className="space-y-6">
+            {/*
+              Hai nguồn xem lại khác hẳn nhau: camera RTSP tua trên file ghi ở
+              đĩa server (MediaMTX), camera EZVIZ tua trên cloud EZVIZ. Không
+              gộp được vào một thanh tua nên tách hai khối, và chỉ hiện khối
+              nào thực sự có camera.
+            */}
+            {ezvizCameras.length > 0 ? <EzvizPlaybackView cameras={ezvizCameras} /> : null}
+            {rtspCameras.length > 0 ? <PlaybackView cameras={rtspCameras} /> : null}
+            {cameras.length === 0 ? (
+              <div className="flex h-64 items-center justify-center rounded-xl border border-border">
+                <p className="text-sm text-muted-foreground">Chưa có camera nào</p>
+              </div>
+            ) : null}
+          </div>
         )
       ) : null}
 

@@ -1,3 +1,5 @@
+import { EzvizError, ezvizErrorMessage } from "@/lib/aibox/ezviz-api";
+import { syncEzvizDevices, type EzvizSyncResult } from "@/lib/aibox/ezviz-sync";
 import { reconcileCameraPaths } from "@/lib/aibox/mediamtx-paths";
 import { connectMongo } from "@/lib/mongodb";
 import { CameraModel } from "@/models/camera";
@@ -35,16 +37,25 @@ export async function POST(request: NextRequest) {
   }
 
   await connectMongo();
-  const cameras = await CameraModel.find({}, { code: 1, rtspUrl: 1 }).lean<
-    { code: string; rtspUrl: string }[]
+  const cameras = await CameraModel.find({}, { code: 1, rtspUrl: 1, source: 1 }).lean<
+    { code: string; rtspUrl?: string; source?: "rtsp" | "ezviz" }[]
   >();
+
+  // EZVIZ và MediaMTX độc lập nhau: bên nào hỏng cũng không được kéo bên kia
+  // xuống. Đồng bộ EZVIZ chạy trong try riêng, lỗi chỉ ghi vào response.
+  let ezviz: EzvizSyncResult | { error: string };
+  try {
+    ezviz = await syncEzvizDevices();
+  } catch (e) {
+    ezviz = { error: e instanceof EzvizError ? ezvizErrorMessage(e.code) : "Đồng bộ EZVIZ lỗi" };
+  }
 
   try {
     const result = await reconcileCameraPaths(cameras);
-    return NextResponse.json({ ok: true, ...result, cameras: cameras.length });
+    return NextResponse.json({ ok: true, ...result, cameras: cameras.length, ezviz });
   } catch {
     return NextResponse.json(
-      { ok: false, error: "Không kết nối được máy chủ media" },
+      { ok: false, error: "Không kết nối được máy chủ media", ezviz },
       { status: 502 }
     );
   }

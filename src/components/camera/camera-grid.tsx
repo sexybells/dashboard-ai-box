@@ -1,7 +1,8 @@
 "use client";
 
-import { Pencil, Plus, Trash2, VideoOff } from "lucide-react";
+import { Maximize2, Pencil, Plus, Trash2, VideoOff } from "lucide-react";
 import { useState } from "react";
+import { EzvizPlayer } from "@/components/camera/ezviz-player";
 import { HlsPlayer } from "@/components/camera/hls-player";
 import { useLiveUrls } from "@/components/camera/use-live-urls";
 import { cn } from "@/lib/cn";
@@ -19,6 +20,34 @@ interface CameraGridProps {
   onChanged: () => void;
 }
 
+/**
+ * Phần video của camera RTSP. Tách riêng vì useLiveUrls chỉ có nghĩa với
+ * camera đi qua MediaMTX — hook không được gọi có điều kiện, nên camera EZVIZ
+ * phải nằm ở nhánh component khác chứ không phải nhánh `if` trong cùng hàm.
+ */
+function RtspTileVideo({ cam }: { cam: CameraListItem }) {
+  const { live, error } = useLiveUrls(cam.code);
+
+  if (!cam.online) {
+    return (
+      <div className="flex size-full flex-col items-center justify-center gap-2">
+        <VideoOff className="size-6 text-muted-foreground" />
+        <p className="text-xs text-muted-foreground">Camera mất kết nối</p>
+      </div>
+    );
+  }
+  if (live) {
+    return <HlsPlayer src={live.hls} auth={live.auth} className="size-full" />;
+  }
+  return (
+    <div className="flex size-full items-center justify-center">
+      <p className="text-xs text-muted-foreground">
+        {error ? "Không tải được cấu hình luồng" : "Đang tải…"}
+      </p>
+    </div>
+  );
+}
+
 function GridTile({
   cam,
   onSelect,
@@ -30,7 +59,6 @@ function GridTile({
   onEdit: (camera: CameraListItem) => void;
   onChanged: () => void;
 }) {
-  const { live, error } = useLiveUrls(cam.code);
   const [deleting, setDeleting] = useState(false);
 
   const remove = async () => {
@@ -49,48 +77,62 @@ function GridTile({
 
   return (
     <div className="group relative overflow-hidden rounded-xl border border-border bg-black">
-      <button
-        type="button"
-        onClick={() => onSelect(cam.code)}
-        className="block w-full text-left transition hover:opacity-95"
-      >
+      {/*
+        Camera RTSP: cả khung là nút mở toàn màn hình (video chỉ là ảnh động,
+        không nhận click). Camera EZVIZ: player của EZUIKit có nút bấm và hộp
+        thoại riêng — bọc trong <button> là nút lồng nút, HTML sai và click bị
+        nuốt. Nên EZVIZ mở toàn khung bằng nút phóng to ở thanh hover.
+      */}
+      {cam.source === "ezviz" ? (
         <div className="aspect-video">
-          {!cam.online ? (
-            <div className="flex size-full flex-col items-center justify-center gap-2">
-              <VideoOff className="size-6 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">Camera mất kết nối</p>
-            </div>
-          ) : live ? (
-            <HlsPlayer src={live.hls} auth={live.auth} className="size-full" />
-          ) : (
-            <div className="flex size-full items-center justify-center">
-              <p className="text-xs text-muted-foreground">
-                {error ? "Không tải được cấu hình luồng" : "Đang tải…"}
-              </p>
-            </div>
-          )}
+          <EzvizPlayer code={cam.code} kind="live" onVerifyCodeSaved={onChanged} />
         </div>
-      </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onSelect(cam.code)}
+          className="block w-full text-left transition hover:opacity-95"
+        >
+          <div className="aspect-video">
+            <RtspTileVideo cam={cam} />
+          </div>
+        </button>
+      )}
 
-      {/* Nút sửa / xoá — hiện khi hover, nổi góc trên phải. */}
+      {/* Nút mở rộng / sửa / xoá — hiện khi hover, nổi góc trên phải. */}
       <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition group-hover:opacity-100">
-        <button
-          type="button"
-          onClick={() => onEdit(cam)}
-          title="Sửa"
-          className="rounded-md bg-black/60 p-1.5 text-white transition hover:bg-black/80"
-        >
-          <Pencil className="size-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => void remove()}
-          disabled={deleting}
-          title="Xoá"
-          className="rounded-md bg-black/60 p-1.5 text-white transition hover:bg-destructive disabled:opacity-50"
-        >
-          <Trash2 className="size-3.5" />
-        </button>
+        {cam.source === "ezviz" ? (
+          // Camera EZVIZ được quản lý ở tài khoản EZVIZ: sửa tên hay xoá ở đây
+          // sẽ bị lần đồng bộ kế tiếp ghi đè / tạo lại, nên chỉ cho xem.
+          <button
+            type="button"
+            onClick={() => onSelect(cam.code)}
+            title="Xem toàn khung"
+            className="rounded-md bg-black/60 p-1.5 text-white transition hover:bg-black/80"
+          >
+            <Maximize2 className="size-3.5" />
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => onEdit(cam)}
+              title="Sửa"
+              className="rounded-md bg-black/60 p-1.5 text-white transition hover:bg-black/80"
+            >
+              <Pencil className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => void remove()}
+              disabled={deleting}
+              title="Xoá"
+              className="rounded-md bg-black/60 p-1.5 text-white transition hover:bg-destructive disabled:opacity-50"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </>
+        )}
       </div>
 
       {/* Dải tên + trạng thái (không chặn click mở toàn khung). */}

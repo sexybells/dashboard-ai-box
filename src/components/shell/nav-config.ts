@@ -7,9 +7,8 @@ import {
   LayoutDashboard,
   Mail,
   MessageSquare,
-  Settings
-  // Video — tạm ẩn module Camera (2026-08-12). Bật lại: khôi phục import này
-  // + mục nav "Camera trực tiếp" bên dưới.
+  Settings,
+  Video
 } from "lucide-react";
 
 export interface NavItem {
@@ -35,7 +34,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Cảnh báo", href: "/alarms", icon: Bell },
       // Tạm ẩn module Camera (2026-08-12): MediaMTX đã stop/disable trên server,
       // recordings đã xoá. Route /camera vẫn build, chỉ ẩn khỏi menu.
-      // { label: "Camera trực tiếp", href: "/camera", icon: Video },
+      { label: "Camera trực tiếp", href: "/camera", icon: Video },
       { label: "Phân tích", href: "/analytics", icon: BarChart3 }
     ]
   },

@@ -78,14 +78,22 @@ export async function listConfiguredPathNames(): Promise<string[]> {
  * Lỗi từng path không chặn các path còn lại.
  */
 export async function reconcileCameraPaths(
-  cameras: { code: string; rtspUrl: string }[]
+  cameras: { code: string; rtspUrl?: string; source?: "rtsp" | "ezviz" }[]
 ): Promise<{ added: number; replaced: number; removed: number }> {
+  // Camera EZVIZ phát qua EZVIZ Cloud, không có path MediaMTX. Lọc ở đây chứ
+  // không chỉ ở caller: thiếu bộ lọc thì cron sẽ cố tạo path cho camera không
+  // có rtspUrl mỗi phút, và vòng dọn path bên dưới sẽ xoá nhầm path camNN.
+  const rtspCameras = cameras.filter(
+    (c): c is { code: string; rtspUrl: string; source?: "rtsp" } =>
+      (c.source ?? "rtsp") === "rtsp" && Boolean(c.rtspUrl)
+  );
+
   const existing = new Set(await listConfiguredPathNames());
   let added = 0;
   let replaced = 0;
   let removed = 0;
 
-  for (const cam of cameras) {
+  for (const cam of rtspCameras) {
     try {
       if (!existing.has(cam.code)) {
         await ensureCameraPath(cam.code, cam.rtspUrl);
@@ -106,9 +114,14 @@ export async function reconcileCameraPaths(
     }
   }
 
-  const wanted = new Set(cameras.map((c) => c.code));
+  // Chỉ xoá path thật sự mồ côi. Camera RTSP có doc hỏng (thiếu rtspUrl) vẫn
+  // được giữ path — doc hỏng là việc phải sửa, không phải cớ để xoá luồng.
+  // Camera EZVIZ thì ngược lại: có path camNN nghĩa là sót lại, nên xoá.
+  const keep = new Set(
+    cameras.filter((c) => (c.source ?? "rtsp") === "rtsp").map((c) => c.code)
+  );
   for (const name of existing) {
-    if (/^cam\d{2,}$/.test(name) && !wanted.has(name)) {
+    if (/^cam\d{2,}$/.test(name) && !keep.has(name)) {
       try {
         await deleteCameraPath(name);
         removed++;

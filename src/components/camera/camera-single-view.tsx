@@ -2,7 +2,9 @@
 
 import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { EzvizPlayer } from "@/components/camera/ezviz-player";
 import { HlsPlayer } from "@/components/camera/hls-player";
+import { PtzPad } from "@/components/camera/ptz-pad";
 import { useLiveUrls } from "@/components/camera/use-live-urls";
 import { WebrtcPlayer } from "@/components/camera/webrtc-player";
 import { cn } from "@/lib/cn";
@@ -28,6 +30,66 @@ interface CameraSingleViewProps {
 }
 
 export function CameraSingleView({ camera, onBack }: CameraSingleViewProps) {
+  // Camera EZVIZ đi đường hoàn toàn khác (player EZUIKit + PTZ, không có
+  // WebRTC/HLS của MediaMTX) nên tách hẳn thành component riêng — nhánh này
+  // phải nằm trước mọi hook của luồng RTSP.
+  if (camera.source === "ezviz") {
+    return <EzvizSingleView camera={camera} onBack={onBack} />;
+  }
+  return <RtspSingleView camera={camera} onBack={onBack} />;
+}
+
+function EzvizSingleView({ camera, onBack }: CameraSingleViewProps) {
+  return (
+    <div className="space-y-3">
+      <SingleViewHeader camera={camera} onBack={onBack} badge="EZVIZ" />
+
+      <div className="h-[calc(100dvh-17rem)] min-h-[18rem] overflow-hidden rounded-xl border border-border bg-black">
+        <EzvizPlayer code={camera.code} kind="live" />
+      </div>
+
+      <div className="rounded-xl border border-border p-3">
+        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Điều khiển camera
+        </p>
+        <PtzPad code={camera.code} />
+      </div>
+    </div>
+  );
+}
+
+function SingleViewHeader({
+  camera,
+  onBack,
+  badge
+}: CameraSingleViewProps & { badge: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground"
+      >
+        <ArrowLeft className="size-4" />
+        Tất cả camera
+      </button>
+      <div className="flex items-center gap-2">
+        <span
+          className={cn("size-2 rounded-full", camera.online ? "bg-emerald-500" : "bg-destructive")}
+        />
+        <span className="text-sm font-medium">{camera.name}</span>
+        {camera.location ? (
+          <span className="text-xs text-muted-foreground">{camera.location}</span>
+        ) : null}
+      </div>
+      <span className="ml-auto rounded-full border border-border px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+        {badge}
+      </span>
+    </div>
+  );
+}
+
+function RtspSingleView({ camera, onBack }: CameraSingleViewProps) {
   const [transport, setTransport] = useState<"webrtc" | "hls">("webrtc");
   const { live, error: liveError } = useLiveUrls(camera.code);
   const errorCount = useRef(0);
@@ -57,28 +119,11 @@ export function CameraSingleView({ camera, onBack }: CameraSingleViewProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Tất cả camera
-        </button>
-        <div className="flex items-center gap-2">
-          <span
-            className={cn("size-2 rounded-full", camera.online ? "bg-emerald-500" : "bg-destructive")}
-          />
-          <span className="text-sm font-medium">{camera.name}</span>
-          {camera.location ? (
-            <span className="text-xs text-muted-foreground">{camera.location}</span>
-          ) : null}
-        </div>
-        <span className="ml-auto rounded-full border border-border px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-          {transport === "webrtc" ? "WebRTC" : "HLS"}
-        </span>
-      </div>
+      <SingleViewHeader
+        camera={camera}
+        onBack={onBack}
+        badge={transport === "webrtc" ? "WebRTC" : "HLS"}
+      />
 
       <div className="h-[calc(100dvh-14rem)] min-h-[20rem] overflow-hidden rounded-xl border border-border bg-black">
         {!camera.online ? (

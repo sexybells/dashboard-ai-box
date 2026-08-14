@@ -91,9 +91,13 @@ function GridTile({
             Điều khiển xoay ngay trên ô, không bắt người dùng mở toàn khung.
             Nút PTZ sẵn có của EZUIKit đã bị ẩn (tiếng Anh, trùng chức năng),
             nên đây là lối điều khiển duy nhất ở màn hình lưới.
+
+            HIỆN THƯỜNG TRỰC, không giấu sau hover: màn hình cảm ứng không có
+            hover nên nút sẽ không bao giờ xuất hiện, và ngay trên máy tính
+            người dùng cũng không đoán được là phải rê chuột vào mới thấy.
           */}
           {!cam.needsVerifyCode ? (
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 transition group-hover:opacity-100">
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
               <PtzPad code={cam.code} compact />
             </div>
           ) : null}

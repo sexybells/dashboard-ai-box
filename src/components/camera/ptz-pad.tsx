@@ -17,6 +17,13 @@ const DIRECTIONS: { direction: PtzDirection; label: string; Icon: typeof Chevron
     { direction: 1, label: "Xuống", Icon: ChevronDown, cell: "col-start-2 row-start-3" }
   ];
 
+/**
+ * Thời gian xoay tối thiểu cho một cú bấm (ms). Bấm nhanh chỉ dài ~3ms nên
+ * thiếu mốc này thì camera đứng yên. 400ms cho ra một nhịp xoay thấy rõ mà
+ * không quá đà.
+ */
+const PTZ_MIN_MOVE_MS = 400;
+
 const ZOOMS: { direction: PtzDirection; label: string; Icon: typeof Plus }[] = [
   { direction: 8, label: "Phóng to", Icon: Plus },
   { direction: 9, label: "Thu nhỏ", Icon: Minus }
@@ -24,23 +31,63 @@ const ZOOMS: { direction: PtzDirection; label: string; Icon: typeof Plus }[] = [
 
 export function PtzPad({ code }: { code: string }) {
   const holding = useRef<PtzDirection | null>(null);
+  /** Thời điểm gửi lệnh start, để biết đã xoay đủ lâu chưa. */
+  const startedAt = useRef(0);
+  const stopTimer = useRef<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const stop = useCallback(
-    (options?: { keepalive?: boolean }) => {
-      const direction = holding.current;
-      if (direction === null) return;
-      holding.current = null;
+  const sendStop = useCallback(
+    (direction: PtzDirection, options?: { keepalive?: boolean }) => {
       void sendPtz(code, { direction, action: "stop" }, options);
     },
     [code]
   );
 
+  /**
+   * Nhả tay. Một cú bấm bình thường chỉ dài vài mili-giây — gửi stop ngay thì
+   * camera nhận start/stop gần như cùng lúc và đứng yên, người dùng tưởng nút
+   * hỏng. Nên giữ lệnh chạy đủ PTZ_MIN_MOVE_MS rồi mới dừng; giữ lâu hơn thì
+   * dừng ngay khi nhả. `immediate` dành cho unmount/ẩn tab: lúc đó an toàn
+   * quan trọng hơn, dừng luôn.
+   */
+  const stop = useCallback(
+    (options?: { keepalive?: boolean; immediate?: boolean }) => {
+      const direction = holding.current;
+      if (direction === null) return;
+      holding.current = null;
+
+      if (stopTimer.current !== null) {
+        window.clearTimeout(stopTimer.current);
+        stopTimer.current = null;
+      }
+
+      const elapsed = Date.now() - startedAt.current;
+      const remaining = PTZ_MIN_MOVE_MS - elapsed;
+      if (options?.immediate || remaining <= 0) {
+        sendStop(direction, options);
+        return;
+      }
+      stopTimer.current = window.setTimeout(() => {
+        stopTimer.current = null;
+        sendStop(direction);
+      }, remaining);
+    },
+    [sendStop]
+  );
+
   const start = useCallback(
     (direction: PtzDirection) => {
-      // Đang giữ hướng khác mà bấm hướng mới: dừng hướng cũ trước.
-      if (holding.current !== null) stop();
+      // Đang giữ hướng khác mà bấm hướng mới: dừng hướng cũ ngay, không chờ.
+      if (holding.current !== null) stop({ immediate: true });
+      // Còn lệnh dừng đang hẹn giờ từ cú bấm trước thì huỷ, kẻo nó dừng nhầm
+      // lượt xoay mới.
+      if (stopTimer.current !== null) {
+        window.clearTimeout(stopTimer.current);
+        stopTimer.current = null;
+      }
+
       holding.current = direction;
+      startedAt.current = Date.now();
       setError(null);
       void sendPtz(code, { direction, speed: 1, action: "start" }).catch(() => {
         holding.current = null;
@@ -51,14 +98,15 @@ export function PtzPad({ code }: { code: string }) {
   );
 
   // Unmount (đổi camera, rời tab, đóng trang) vẫn phải dừng. keepalive để
-  // request kịp bay đi khi trang đang bị gỡ.
+  // request kịp bay đi khi trang đang bị gỡ; immediate vì không còn component
+  // nào sống để chạy hẹn giờ.
   useEffect(() => {
-    return () => stop({ keepalive: true });
+    return () => stop({ keepalive: true, immediate: true });
   }, [stop]);
 
   // Tab bị ẩn / cửa sổ mất focus trong lúc đang giữ → coi như nhả tay.
   useEffect(() => {
-    const onHide = () => stop({ keepalive: true });
+    const onHide = () => stop({ keepalive: true, immediate: true });
     document.addEventListener("visibilitychange", onHide);
     window.addEventListener("blur", onHide);
     return () => {

@@ -44,7 +44,12 @@ function EzvizSingleView({ camera, onBack }: CameraSingleViewProps) {
     <div className="space-y-3">
       <SingleViewHeader camera={camera} onBack={onBack} badge="EZVIZ" />
 
-      <div className="h-[calc(100dvh-17rem)] min-h-[18rem] overflow-hidden rounded-xl border border-border bg-black">
+      {/*
+        Chừa chỗ cho cụm PTZ ngay bên dưới: để khung hình cao như bản RTSP thì
+        cụm điều khiển rơi xuống dưới đáy màn hình, người dùng phải cuộn mới
+        thấy và tưởng là không điều khiển được.
+      */}
+      <div className="h-[calc(100dvh-24rem)] min-h-[14rem] overflow-hidden rounded-xl border border-border bg-black">
         <EzvizPlayer code={camera.code} kind="live" />
       </div>
 

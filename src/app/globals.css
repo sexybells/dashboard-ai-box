@@ -125,3 +125,29 @@
     -moz-osx-font-smoothing: grayscale;
   }
 }
+
+/*
+ * Player EZVIZ (EZUIKit) — ẩn các nút không dùng được trên dashboard này.
+ *
+ * Template "pcLive"/"pcRec" là bộ giao diện đầy đủ cho người dùng cuối của
+ * EZVIZ, phơi ra cả tính năng mà tài khoản/hạ tầng ở đây không đáp ứng được:
+ * bấm vào chỉ hiện "Permission denied", hỏi quyền micro, hoặc mở panel trùng
+ * với chức năng dashboard đã có. Thư viện không cho chọn template gọn hơn
+ * (đặt "simple" làm constructor ném lỗi) nên chặn bằng CSS là cách ít rủi ro
+ * nhất. Bám theo class của thư viện chứ không theo nhãn chữ, để đổi ngôn ngữ
+ * không làm hỏng.
+ *
+ *   talk, broadcast : cần micro + quyền đàm thoại → "Permission denied"
+ *   alarm-message   : panel cảnh báo EZVIZ, trùng trang Cảnh báo của dashboard
+ *   record          : quay màn hình về máy người xem, không phải ghi hình hệ thống
+ *   ptz             : đã có cụm điều khiển tiếng Việt riêng bên dưới khung hình
+ *   rec-dropdown    : đổi chế độ ngay trong player, trùng tab Xem lại
+ */
+.ezplayer-control-talk,
+.ezplayer-control-broadcast,
+.ezplayer-control-alarm-message,
+.ezplayer-control-record,
+.ezplayer-control-ptz,
+.ezplayer-control-rec-dropdown {
+  display: none !important;
+}

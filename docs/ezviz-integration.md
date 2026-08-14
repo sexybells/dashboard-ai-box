@@ -130,6 +130,30 @@ Kết quả đo trên giao diện: quét toàn trang cả hai tab, **0 ký tự 
 trong `title` và `aria-label`. Muốn dịch thêm chuỗi nào thì thêm khoá vào
 `EZUIKIT_LOCALES`; khoá không tồn tại bị bỏ qua chứ không gây lỗi.
 
+## Những nút đã ẩn khỏi player
+
+Template `pcLive`/`pcRec` là giao diện đầy đủ cho người dùng cuối của EZVIZ,
+phơi ra cả tính năng mà tài khoản/hạ tầng ở đây không đáp ứng được. Bấm vào chỉ
+hiện "Permission denied", hỏi quyền micro, hoặc mở panel trùng chức năng đã có.
+Thư viện không cho chọn template gọn hơn — đặt `template: "simple"` làm
+constructor ném lỗi — nên chặn bằng CSS trong `globals.css`, bám theo class của
+thư viện (không bám nhãn chữ, để đổi ngôn ngữ không làm hỏng):
+
+| Class | Nút | Vì sao ẩn |
+| --- | --- | --- |
+| `ezplayer-control-talk` | Intercom | Cần micro + quyền đàm thoại → "Permission denied" |
+| `ezplayer-control-broadcast` | Voice broadcast | Như trên |
+| `ezplayer-control-alarm-message` | Messages | Panel cảnh báo EZVIZ, trùng trang Cảnh báo |
+| `ezplayer-control-record` | Screen recording | Quay về máy người xem, không phải ghi hình hệ thống |
+| `ezplayer-control-ptz` | PTZ control | Đã có cụm điều khiển tiếng Việt riêng bên dưới |
+| `ezplayer-control-rec-dropdown` | Playback | Đổi chế độ trong player, trùng tab Xem lại |
+
+Còn lại và dùng được: phát/dừng, chụp ảnh, âm lượng, zoom điện tử, chất lượng
+hình, toàn màn hình.
+
+Nếu nâng cấp `ezuikit-js`, kiểm lại danh sách này — class đổi thì nút ẩn sẽ
+hiện lại.
+
 ## Chế độ token tài khoản chính
 
 Mặc định dashboard chỉ phát bằng token **tài khoản con**. Tài khoản con của dự

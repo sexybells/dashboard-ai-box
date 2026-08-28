@@ -114,6 +114,12 @@ export async function readSessionCookie(cookieValue: string | undefined, now = D
   }
 }
 
+export function isRequestSecure(request: { headers: { get(name: string): string | null }; nextUrl: { protocol: string } }): boolean {
+  const forwardedProto = request.headers.get("x-forwarded-proto");
+  if (forwardedProto) return forwardedProto.split(",")[0]?.trim() === "https";
+  return request.nextUrl.protocol === "https:";
+}
+
 export function getSafeRedirectPath(value: string | null | undefined): string {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
 

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { formatUnknown } from "@/components/alarm-display";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { extractDetectionBoxes, extractFrameAspectRatio } from "@/lib/aibox/detection-boxes";
 
 interface AlarmDetailProps {
   alarm: {
@@ -48,24 +49,53 @@ function Row({ label, value }: { label: string; value?: unknown }) {
 
 export function AlarmDetail({ alarm }: AlarmDetailProps) {
   const properties = alarm.raw?.Result?.Properties || [];
+  const boxes = extractDetectionBoxes(alarm.raw);
+  // The stored image is the uncropped frame, just downscaled, so the normalized
+  // coordinates line up as long as the element keeps the source aspect ratio.
+  const aspectRatio = extractFrameAspectRatio(alarm.raw) ?? 16 / 9;
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.8fr)]">
       <Card>
         <CardHeader>
           <CardTitle>Ảnh cảnh báo</CardTitle>
+          {boxes.length > 0 ? (
+            <span className="text-xs text-muted-foreground">{boxes.length} vùng phát hiện</span>
+          ) : null}
         </CardHeader>
         <CardContent>
           <div className="grid min-h-[420px] place-items-center overflow-auto rounded-lg border border-dashed border-border bg-muted">
             {alarm.imageUrl ? (
-              <Image
-                src={alarm.imageUrl}
-                alt={alarm.summary || "Cảnh báo AI Box"}
-                width={1000}
-                height={640}
-                unoptimized
-                className="h-auto max-h-[70vh] w-full object-contain"
-              />
+              <div
+                className="relative w-full"
+                style={{ aspectRatio, maxWidth: `calc(70vh * ${aspectRatio})` }}
+              >
+                <Image
+                  src={alarm.imageUrl}
+                  alt={alarm.summary || "Cảnh báo AI Box"}
+                  fill
+                  unoptimized
+                  className="object-contain"
+                />
+                {boxes.map((box, index) => (
+                  <div
+                    key={`${box.x}-${box.y}-${index}`}
+                    className="absolute border-2 border-red-500"
+                    style={{
+                      left: `${box.x * 100}%`,
+                      top: `${box.y * 100}%`,
+                      width: `${box.width * 100}%`,
+                      height: `${box.height * 100}%`
+                    }}
+                  >
+                    {box.label ? (
+                      <span className="absolute -top-px left-0 -translate-y-full whitespace-nowrap bg-red-500 px-1 text-[10px] font-medium leading-4 text-white">
+                        {box.label}
+                      </span>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="px-6 py-10 text-center text-sm text-muted-foreground">
                 Không có ảnh cục bộ. Nguồn: {alarm.imageOriginal || alarm.imageKind || "không có"}

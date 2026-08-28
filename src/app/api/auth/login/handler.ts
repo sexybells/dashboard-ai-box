@@ -4,6 +4,7 @@ import {
   AUTH_COOKIE_MAX_AGE,
   AUTH_COOKIE_NAME,
   createSessionCookieValue,
+  isRequestSecure,
   validateCredentials
 } from "@/lib/auth";
 
@@ -36,7 +37,7 @@ export async function handleLoginRequest(request: NextRequest) {
     name: AUTH_COOKIE_NAME,
     value: await createSessionCookieValue(username),
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isRequestSecure(request),
     sameSite: "lax",
     maxAge: AUTH_COOKIE_MAX_AGE,
     path: "/"

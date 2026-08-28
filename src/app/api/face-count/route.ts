@@ -103,8 +103,11 @@ export async function GET(request: NextRequest) {
 
   const [rows, latest] = await Promise.all([
     AlarmModel.aggregate<DayCameraTotal>(DAY_CAMERA_TOTALS),
+    // Sorted by `timestamp` (true UTC), never by `time`. The box's clock was an
+    // hour fast until 2026-08-28 10:10 and was then corrected, so `time` strings
+    // are not monotonic across that moment and would return a stale document.
     AlarmModel.findOne({ summary: FACEIDCOUNT_SUMMARY }, { timestamp: 1, raw: 1, mediaName: 1 })
-      .sort({ time: -1 })
+      .sort({ timestamp: -1 })
       .lean()
   ]);
 

@@ -35,7 +35,7 @@ const AlarmSchema = new Schema<AlarmDocument>(
     description: { type: String, index: true },
     time: { type: Date, index: true },
     timeText: { type: String },
-    timestamp: { type: Number },
+    timestamp: { type: Number, index: true },
     boardId: { type: String },
     boardIp: { type: String },
     mediaName: { type: String, index: true },

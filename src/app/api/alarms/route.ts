@@ -1,5 +1,6 @@
 import { connectMongo } from "@/lib/mongodb";
 import { AlarmModel, type AlarmDocument } from "@/models/alarm";
+import { NON_ALARM_SUMMARIES } from "@/lib/aibox/event-types";
 import { deleteAlarmsByIds, parseDeleteIds } from "@/services/alarm-deletion";
 import { serializeAlarmListItem } from "@/services/alarm-serializer";
 import type { QueryFilter } from "mongoose";
@@ -28,6 +29,13 @@ export async function GET(request: NextRequest) {
   for (const key of ["taskSession", "summary", "description", "mediaName"] as const) {
     const value = searchParams.get(key)?.trim();
     if (value) filter[key] = value;
+  }
+
+  // Counting events (People Counting / Line Crossing) and the FaceIdCount
+  // statistics heartbeat are traffic data, not alarms — hide them unless the
+  // caller asks for that summary explicitly.
+  if (!filter.summary) {
+    filter.summary = { $nin: [...NON_ALARM_SUMMARIES] };
   }
 
   const from = searchParams.get("from");
@@ -60,7 +68,9 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .lean<AlarmDocument[]>(),
     AlarmModel.countDocuments(filter),
-    AlarmModel.estimatedDocumentCount()
+    // "Tổng cảnh báo" must exclude the same non-alarm traffic the list hides —
+    // otherwise the ~60s FaceIdCount heartbeat (~2.880/day) swamps the number.
+    AlarmModel.countDocuments({ summary: { $nin: [...NON_ALARM_SUMMARIES] } })
   ]);
 
   return NextResponse.json({

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Bell, CalendarClock, Cctv, Tag } from "lucide-react";
+import { Bell, CalendarClock, Cctv, Tag, Users } from "lucide-react";
 import { formatAlarmTime } from "@/components/alarm-display";
 import { useRealtimeStatus } from "@/components/use-realtime-status";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,12 +12,14 @@ import { StatCard } from "@/components/ui/stat-card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { fetchAlarmList, type AlarmListItem } from "@/services/alarm-client";
 import { fetchAlarmStats, type AlarmStats } from "@/services/alarm-stats-client";
+import { fetchFaceCount, type FaceCountResponse } from "@/services/face-count-client";
 
 const emptyFilters = { q: "", taskSession: "", summary: "", mediaName: "" };
 
 export function OverviewDashboard() {
   const [stats, setStats] = useState<AlarmStats | null>(null);
   const [recent, setRecent] = useState<AlarmListItem[]>([]);
+  const [faceCount, setFaceCount] = useState<FaceCountResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const realtimeStatus = useRealtimeStatus();
@@ -36,6 +38,15 @@ export function OverviewDashboard() {
       .finally(() => {
         if (active) setIsLoading(false);
       });
+    // Fetched on its own so a face-count failure cannot blank the whole page.
+    void fetchFaceCount()
+      .then((result) => {
+        if (active) setFaceCount(result);
+      })
+      .catch(() => {
+        /* visitor counter is supplementary — leave it empty on failure */
+      });
+
     return () => {
       active = false;
     };
@@ -75,6 +86,24 @@ export function OverviewDashboard() {
         />
       ) : (
         <>
+          <Card className="p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">Khách ra vào hôm nay</p>
+                <p className="mt-2 text-4xl font-semibold tracking-tight">
+                  {(faceCount?.total ?? 0).toLocaleString("vi-VN")}
+                </p>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Số khách duy nhất — một người vào rồi ra chỉ tính một lượt
+                  {faceCount?.camera ? ` · nguồn: ${faceCount.camera}` : ""}
+                </p>
+              </div>
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
+                <Users className="size-5" />
+              </span>
+            </div>
+          </Card>
+
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <StatCard label="Tổng cảnh báo" value={(stats?.total ?? 0).toLocaleString("vi-VN")} icon={Bell} />
             <StatCard label="Hôm nay" value={(stats?.today ?? 0).toLocaleString("vi-VN")} icon={CalendarClock} />

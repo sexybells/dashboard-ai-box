@@ -1,6 +1,7 @@
 import { connectMongo } from "@/lib/mongodb";
 import { AlarmModel } from "@/models/alarm";
 import { computeStats, type StatInput } from "@/lib/aibox/alarm-stats";
+import { NON_ALARM_SUMMARIES } from "@/lib/aibox/event-types";
 import { NextRequest, NextResponse } from "next/server";
 
 // Cap the working set so aggregation stays cheap; alarm volumes are modest and
@@ -24,7 +25,10 @@ export async function GET(request: NextRequest) {
 
   await connectMongo();
 
-  const docs = (await AlarmModel.find({}, { time: 1, timeText: 1, mediaName: 1, summary: 1 })
+  const docs = (await AlarmModel.find(
+    { summary: { $nin: [...NON_ALARM_SUMMARIES] } },
+    { time: 1, timeText: 1, mediaName: 1, summary: 1 }
+  )
     .sort({ time: -1 })
     .limit(MAX_DOCS)
     .lean()) as StatInput[];

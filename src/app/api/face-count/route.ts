@@ -1,10 +1,8 @@
 import { connectMongo } from "@/lib/mongodb";
 import { AlarmModel } from "@/models/alarm";
 import {
-  extractFaceIdWindows,
-  pickCameraTotal,
-  totalFromSnapshots,
-  type CameraFaceCount,
+  summarizePeriods,
+  type DayCameraTotal,
   type FaceIdWindow
 } from "@/lib/aibox/face-id-count";
 import { FACEIDCOUNT_SUMMARY } from "@/lib/aibox/event-types";
@@ -12,10 +10,6 @@ import { isDateKey } from "@/lib/aibox/period-buckets";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
-
-// The box heartbeats every ~60s per camera, so a day holds ~1.500 documents per
-// camera. Cap the working set well above that; the `time` index backs the sort.
-const MAX_DOCS = 5000;
 
 function vietnamTodayKey(): string {
   // en-CA formats as YYYY-MM-DD; pin to Vietnam time to match the display rule.
@@ -27,35 +21,79 @@ function vietnamTodayKey(): string {
   }).format(new Date());
 }
 
-function shiftDay(key: string, deltaDays: number): string {
-  const d = new Date(`${key}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + deltaDays);
-  return d.toISOString().slice(0, 10);
-}
-
 /**
- * Box-independent day key for an event.
+ * Reduce every FaceIdCount heartbeat to one row per (day, camera) inside Mongo.
  *
- * `TimeStamp` (µs since the UTC epoch) is the trustworthy clock: it matches the
- * server's receive time to the second. The box's `Time` string is currently an
- * hour fast (its timezone is set to UTC+8, not UTC+7), so bucketing by that
- * string would misfile every event near midnight into the wrong day.
+ * Done as an aggregation rather than in Node because the box heartbeats every
+ * ~60s per camera — with seven cameras that is ~10.000 documents a day, and the
+ * running total has to look at every day on record. The output is tiny: days ×
+ * cameras.
+ *
+ * The `$max` on Count is the important step: each heartbeat resends the same
+ * CUMULATIVE window figure, so the day's value is the highest one seen, never
+ * the sum of the beats. Windows within a day are disjoint hour ranges and ARE
+ * summed.
+ *
+ * Days come from `timestamp` (µs, UTC) — it matches the server clock exactly,
+ * while the box's own `Time` string currently runs an hour fast and would file
+ * events near midnight under the wrong day. `time` is the fallback for any
+ * document written without a timestamp.
  */
-function vietnamDayOf(timestampMicros?: number, time?: Date | null): string | null {
-  const ms =
-    typeof timestampMicros === "number" && Number.isFinite(timestampMicros)
-      ? timestampMicros / 1000
-      : time
-        ? time.getTime()
-        : NaN;
-  if (!Number.isFinite(ms)) return null;
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Ho_Chi_Minh",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(new Date(ms));
-}
+const DAY_CAMERA_TOTALS = [
+  { $match: { summary: FACEIDCOUNT_SUMMARY } },
+  {
+    $project: {
+      camera: { $ifNull: ["$mediaName", "(không rõ camera)"] },
+      day: {
+        $dateToString: {
+          format: "%Y-%m-%d",
+          timezone: "Asia/Ho_Chi_Minh",
+          date: {
+            $cond: [
+              { $gt: [{ $ifNull: ["$timestamp", 0] }, 0] },
+              { $toDate: { $divide: ["$timestamp", 1000] } },
+              "$time"
+            ]
+          }
+        }
+      },
+      windows: {
+        $let: {
+          vars: {
+            entry: {
+              $filter: {
+                input: { $ifNull: ["$raw.Result.Properties", []] },
+                as: "property",
+                cond: { $eq: ["$$property.property", "FaceIdCount"] }
+              }
+            }
+          },
+          in: { $ifNull: [{ $arrayElemAt: ["$$entry.value", 0] }, []] }
+        }
+      }
+    }
+  },
+  { $unwind: "$windows" },
+  {
+    $group: {
+      _id: {
+        day: "$day",
+        camera: "$camera",
+        window: {
+          $concat: [{ $toString: "$windows.Start" }, "-", { $toString: "$windows.End" }]
+        }
+      },
+      count: { $max: { $ifNull: ["$windows.Count", 0] } }
+    }
+  },
+  {
+    $group: {
+      _id: { day: "$_id.day", camera: "$_id.camera" },
+      total: { $sum: "$count" }
+    }
+  },
+  { $project: { _id: 0, day: "$_id.day", camera: "$_id.camera", total: 1 } }
+];
 
 export async function GET(request: NextRequest) {
   const dayParam = request.nextUrl.searchParams.get("day");
@@ -63,60 +101,41 @@ export async function GET(request: NextRequest) {
 
   await connectMongo();
 
-  // Prefilter on the indexed `time` field, widened ±1 day: `time` is parsed from
-  // the box's local string, which is both an hour fast and read in the server's
-  // timezone, so it can sit several hours away from the true instant. The exact
-  // day is decided below from `timestamp`.
-  const docs = await AlarmModel.find(
-    {
-      summary: FACEIDCOUNT_SUMMARY,
-      time: {
-        $gte: new Date(`${shiftDay(day, -1)}T00:00:00.000Z`),
-        $lte: new Date(`${shiftDay(day, 1)}T23:59:59.999Z`)
-      }
-    },
-    { mediaName: 1, timestamp: 1, time: 1, raw: 1 }
-  )
-    .sort({ time: -1 })
-    .limit(MAX_DOCS)
-    .lean();
+  const [rows, latest] = await Promise.all([
+    AlarmModel.aggregate<DayCameraTotal>(DAY_CAMERA_TOTALS),
+    AlarmModel.findOne({ summary: FACEIDCOUNT_SUMMARY }, { timestamp: 1, raw: 1, mediaName: 1 })
+      .sort({ time: -1 })
+      .lean()
+  ]);
 
-  // Group the day's snapshots per camera; cameras are counted separately because
-  // their face-id counters overlap and must not be added together.
-  const snapshotsByCamera = new Map<string, FaceIdWindow[][]>();
-  let updatedAt: string | null = null;
+  // FACE_COUNT_CAMERA pins which camera is the source of truth for every day.
+  // Unset = the highest-counting camera that day, which can never double count.
+  const preferred = process.env.FACE_COUNT_CAMERA;
+  const { periods, byDay, todayCamera } = summarizePeriods(rows, day, preferred);
 
-  for (const doc of docs) {
-    if (vietnamDayOf(doc.timestamp, doc.time) !== day) continue;
-    const windows = extractFaceIdWindows(doc.raw);
-    if (windows.length === 0) continue;
+  // Today's per-camera split, so it is obvious which camera to pin.
+  const camerasToday = rows
+    .filter((row) => row.day === day)
+    .sort((a, b) => b.total - a.total)
+    .map(({ camera, total }) => ({ camera, total }));
 
-    const camera = doc.mediaName ?? "(không rõ camera)";
-    const list = snapshotsByCamera.get(camera);
-    if (list) list.push(windows);
-    else snapshotsByCamera.set(camera, [windows]);
-
-    // Docs arrive newest-first, so the first one we keep is the freshest.
-    if (!updatedAt && typeof doc.timestamp === "number") {
-      updatedAt = new Date(doc.timestamp / 1000).toISOString();
-    }
-  }
-
-  const cameras: CameraFaceCount[] = [...snapshotsByCamera.entries()]
-    .map(([camera, snapshots]) => ({ camera, ...totalFromSnapshots(snapshots) }))
-    .sort((a, b) => b.total - a.total);
-
-  // FACE_COUNT_CAMERA pins which camera is the source of truth. Unset = highest
-  // total, which can never double count.
-  const picked = pickCameraTotal(cameras, process.env.FACE_COUNT_CAMERA);
+  const windows: FaceIdWindow[] =
+    (latest?.raw as { Result?: { Properties?: { property?: string; value?: unknown }[] } })?.Result
+      ?.Properties?.find((property) => property.property === "FaceIdCount")
+      ?.value as FaceIdWindow[] ?? [];
 
   return NextResponse.json({
     ok: true,
     day,
-    total: picked?.total ?? 0,
-    camera: picked?.camera ?? null,
-    windows: picked?.windows ?? [],
-    cameras,
-    updatedAt
+    camera: todayCamera,
+    periods,
+    byDay,
+    camerasToday,
+    /** Hour windows as currently configured on the box, from the newest event. */
+    configuredWindows: Array.isArray(windows) ? windows : [],
+    updatedAt:
+      typeof latest?.timestamp === "number"
+        ? new Date(latest.timestamp / 1000).toISOString()
+        : null
   });
 }

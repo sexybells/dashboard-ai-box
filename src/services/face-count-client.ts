@@ -1,16 +1,23 @@
-import type { CameraFaceCount, FaceIdWindow } from "@/lib/aibox/face-id-count";
+import type {
+  DayCameraTotal,
+  FaceCountPeriods,
+  FaceIdWindow
+} from "@/lib/aibox/face-id-count";
 
-export type { CameraFaceCount, FaceIdWindow };
+export type { DayCameraTotal, FaceCountPeriods, FaceIdWindow };
 
 export interface FaceCountResponse {
   ok: boolean;
+  /** The day treated as "today" for the period figures. */
   day: string;
-  /** Unique visitors for `day`, taken from a single camera (never a sum). */
-  total: number;
+  /** Camera counted for `day` — camera totals are picked, never summed. */
   camera: string | null;
-  windows: FaceIdWindow[];
-  /** Every camera's own total, for diagnosing which one to pin. */
-  cameras: CameraFaceCount[];
+  periods: FaceCountPeriods;
+  /** One row per day, after resolving which camera to count. */
+  byDay: DayCameraTotal[];
+  /** Today's per-camera split, for deciding which camera to pin. */
+  camerasToday: { camera: string; total: number }[];
+  configuredWindows: FaceIdWindow[];
   updatedAt: string | null;
 }
 

@@ -18,17 +18,28 @@
 //    camera and out past the outer camera is counted once by EACH, so camera
 //    totals must never be added together — see pickCameraTotal.
 
+import { mondayOf } from "./period-buckets";
+
 export interface FaceIdWindow {
   start: number; // window start hour as configured on the box
   end: number; // window end hour
   count: number; // unique faces the camera saw inside the window
 }
 
-/** One camera's unique-visitor total for a day, with the windows behind it. */
-export interface CameraFaceCount {
+/** The minimum a camera row needs to be picked between. */
+export interface CameraTotal {
   camera: string;
   total: number;
+}
+
+/** One camera's unique-visitor total for a day, with the windows behind it. */
+export interface CameraFaceCount extends CameraTotal {
   windows: FaceIdWindow[];
+}
+
+/** One camera's total on one box-local day, as reduced by the Mongo pipeline. */
+export interface DayCameraTotal extends CameraTotal {
+  day: string; // YYYY-MM-DD, Asia/Ho_Chi_Minh
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -98,14 +109,86 @@ export function totalFromSnapshots(snapshots: FaceIdWindow[][]): {
  * is the source of truth. Otherwise the highest total wins: it cannot double
  * count, and it keeps working when one camera is offline or blind.
  */
-export function pickCameraTotal(
-  cameras: CameraFaceCount[],
+export function pickCameraTotal<T extends CameraTotal>(
+  cameras: T[],
   preferred?: string | null
-): CameraFaceCount | null {
+): T | null {
   if (cameras.length === 0) return null;
   if (preferred) {
     const match = cameras.find((c) => c.camera === preferred);
     if (match) return match;
   }
   return cameras.reduce((best, c) => (c.total > best.total ? c : best), cameras[0]);
+}
+
+/** Cumulative visitor totals over the usual reporting periods. */
+export interface FaceCountPeriods {
+  today: number;
+  week: number; // ISO week (Monday–Sunday) containing `today`
+  month: number;
+  year: number;
+  all: number; // every day on record — the running total that only grows
+}
+
+export interface FaceCountSummary {
+  periods: FaceCountPeriods;
+  /** The one camera counted per day, after resolving the overlap. */
+  byDay: DayCameraTotal[];
+  todayCamera: string | null;
+}
+
+function shiftDayKey(day: string, deltaDays: number): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Roll per-day-per-camera totals up into cumulative period figures.
+ *
+ * Two different rules on purpose:
+ * - ACROSS CAMERAS on the same day: pick ONE (pinned, else highest). Cameras see
+ *   the same visitor, so adding them multiplies one person by the camera count.
+ * - ACROSS DAYS: add. Days are disjoint, so summing them is the running total.
+ *
+ * Caveat that cannot be settled yet: this assumes the box resets its window
+ * counters each day. No non-zero data has ever arrived, so that is unverified —
+ * if the box turns out to accumulate across days, day totals would already be
+ * cumulative and summing them would over-count.
+ */
+export function summarizePeriods(
+  rows: DayCameraTotal[],
+  today: string,
+  preferred?: string | null
+): FaceCountSummary {
+  const byDayCameras = new Map<string, DayCameraTotal[]>();
+  for (const row of rows) {
+    const list = byDayCameras.get(row.day);
+    if (list) list.push(row);
+    else byDayCameras.set(row.day, [row]);
+  }
+
+  const byDay: DayCameraTotal[] = [];
+  for (const [, cameras] of byDayCameras) {
+    const picked = pickCameraTotal(cameras, preferred);
+    if (picked) byDay.push(picked);
+  }
+  byDay.sort((a, b) => a.day.localeCompare(b.day));
+
+  const monday = mondayOf(today);
+  const sunday = shiftDayKey(monday, 6);
+  const sum = (predicate: (day: string) => boolean) =>
+    byDay.reduce((acc, d) => (predicate(d.day) ? acc + d.total : acc), 0);
+
+  return {
+    periods: {
+      today: sum((d) => d === today),
+      week: sum((d) => d >= monday && d <= sunday),
+      month: sum((d) => d.slice(0, 7) === today.slice(0, 7)),
+      year: sum((d) => d.slice(0, 4) === today.slice(0, 4)),
+      all: sum(() => true)
+    },
+    byDay,
+    todayCamera: byDay.find((d) => d.day === today)?.camera ?? null
+  };
 }

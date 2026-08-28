@@ -16,6 +16,14 @@ import { fetchFaceCount, type FaceCountResponse } from "@/services/face-count-cl
 
 const emptyFilters = { q: "", taskSession: "", summary: "", mediaName: "" };
 
+// Cumulative visitor figures shown under the running total.
+const FACE_COUNT_PERIODS = [
+  { key: "today", label: "Hôm nay" },
+  { key: "week", label: "Tuần này" },
+  { key: "month", label: "Tháng này" },
+  { key: "year", label: "Năm nay" }
+] as const;
+
 export function OverviewDashboard() {
   const [stats, setStats] = useState<AlarmStats | null>(null);
   const [recent, setRecent] = useState<AlarmListItem[]>([]);
@@ -89,9 +97,9 @@ export function OverviewDashboard() {
           <Card className="p-5">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-xs font-medium text-muted-foreground">Khách ra vào hôm nay</p>
+                <p className="text-xs font-medium text-muted-foreground">Khách ra vào — cộng dồn</p>
                 <p className="mt-2 text-4xl font-semibold tracking-tight">
-                  {(faceCount?.total ?? 0).toLocaleString("vi-VN")}
+                  {(faceCount?.periods.all ?? 0).toLocaleString("vi-VN")}
                 </p>
                 <p className="mt-1.5 text-xs text-muted-foreground">
                   Số khách duy nhất — một người vào rồi ra chỉ tính một lượt
@@ -101,6 +109,17 @@ export function OverviewDashboard() {
               <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
                 <Users className="size-5" />
               </span>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-4">
+              {FACE_COUNT_PERIODS.map(({ key, label }) => (
+                <div key={key} className="bg-card px-4 py-3">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-xl font-semibold tracking-tight">
+                    {(faceCount?.periods[key] ?? 0).toLocaleString("vi-VN")}
+                  </p>
+                </div>
+              ))}
             </div>
           </Card>
 

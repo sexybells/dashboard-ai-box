@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractFaceIdWindows,
   pickCameraTotal,
+  summarizePeriods,
   totalFromSnapshots,
   type CameraFaceCount
 } from "./face-id-count";
@@ -89,5 +90,63 @@ describe("pickCameraTotal", () => {
 
   it("returns null when no camera reported", () => {
     expect(pickCameraTotal([])).toBeNull();
+  });
+});
+
+describe("summarizePeriods", () => {
+  // Two cameras seeing the same visitors, across four days spanning a week,
+  // month and year boundary. today = Fri 2026-08-28 (ISO week Mon 24 → Sun 30).
+  const rows = [
+    { day: "2025-12-31", camera: "Sân", total: 4 }, // nam truoc
+    { day: "2026-07-30", camera: "Sân", total: 5 }, // thang truoc
+    { day: "2026-08-24", camera: "Sân", total: 6 }, // dau tuan nay
+    { day: "2026-08-28", camera: "Sân", total: 9 }, // hom nay
+    { day: "2026-08-28", camera: "Ngoài", total: 7 } // cung hom nay, cam khac
+  ];
+
+  it("adds days but never adds cameras on the same day", () => {
+    const { periods } = summarizePeriods(rows, "2026-08-28");
+    // hom nay = 9 (max cua 9 va 7), KHONG phai 16
+    expect(periods.today).toBe(9);
+    expect(periods.week).toBe(6 + 9);
+    expect(periods.month).toBe(6 + 9);
+    expect(periods.year).toBe(5 + 6 + 9);
+    expect(periods.all).toBe(4 + 5 + 6 + 9);
+  });
+
+  it("honours the pinned camera per day", () => {
+    const { periods, todayCamera } = summarizePeriods(rows, "2026-08-28", "Ngoài");
+    expect(periods.today).toBe(7);
+    expect(todayCamera).toBe("Ngoài");
+  });
+
+  it("keeps one row per day, sorted, and names today's source camera", () => {
+    const { byDay, todayCamera } = summarizePeriods(rows, "2026-08-28");
+    expect(byDay.map((d) => d.day)).toEqual([
+      "2025-12-31",
+      "2026-07-30",
+      "2026-08-24",
+      "2026-08-28"
+    ]);
+    expect(todayCamera).toBe("Sân");
+  });
+
+  it("returns zeros with no rows", () => {
+    const { periods, todayCamera } = summarizePeriods([], "2026-08-28");
+    expect(periods).toEqual({ today: 0, week: 0, month: 0, year: 0, all: 0 });
+    expect(todayCamera).toBeNull();
+  });
+
+  it("excludes days outside the ISO week", () => {
+    // Sun 2026-08-23 is the previous week; Mon 2026-08-24 starts this one.
+    const { periods } = summarizePeriods(
+      [
+        { day: "2026-08-23", camera: "Sân", total: 3 },
+        { day: "2026-08-24", camera: "Sân", total: 2 }
+      ],
+      "2026-08-28"
+    );
+    expect(periods.week).toBe(2);
+    expect(periods.month).toBe(5);
   });
 });

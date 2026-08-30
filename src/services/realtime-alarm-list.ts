@@ -1,3 +1,4 @@
+import { NON_ALARM_SUMMARIES } from "@/lib/aibox/event-types";
 import type { AlarmFilters, AlarmListItem, AlarmListResponse } from "./alarm-client";
 
 export interface RealtimeAlarmMergeResult {
@@ -8,6 +9,21 @@ export interface RealtimeAlarmMergeResult {
 
 function includesText(value: string | undefined, query: string): boolean {
   return Boolean(value && value.toLowerCase().includes(query));
+}
+
+/**
+ * Whether the realtime stream should drop this event before it reaches the list.
+ *
+ * Mirrors /api/alarms, which hides the counting traffic (HeadCount, PeopleCross,
+ * FaceIdCount) unless that summary is asked for by name. The stream publishes
+ * EVERY event the box sends, so without this the Cảnh báo page would grow
+ * HeadCount rows live — thousands a day — even though reloading the page made
+ * them disappear again, and the totals would drift away from the API's.
+ */
+export function isHiddenFromAlarmList(alarm: AlarmListItem, filters: AlarmFilters): boolean {
+  if (filters.summary.trim()) return false; // asked for by name — show it
+  const summaries: readonly string[] = NON_ALARM_SUMMARIES;
+  return Boolean(alarm.summary && summaries.includes(alarm.summary));
 }
 
 export function alarmMatchesFilters(alarm: AlarmListItem, filters: AlarmFilters): boolean {
@@ -40,6 +56,10 @@ export function mergeRealtimeAlarm(
   filters: AlarmFilters,
   limit = current.limit
 ): RealtimeAlarmMergeResult {
+  if (isHiddenFromAlarmList(alarm, filters)) {
+    return { data: current, inserted: false, highlightedId: null };
+  }
+
   const existingIndex = current.data.findIndex((item) => item.id === alarm.id);
 
   if (existingIndex >= 0) {

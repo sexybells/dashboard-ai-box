@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { BarChart3, Bell, LayoutDashboard, Settings } from "lucide-react";
+import { BarChart3, Bell, LayoutDashboard, Settings, Users } from "lucide-react";
 
 export interface NavItem {
   label: string;
@@ -21,6 +21,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Tổng quan", href: "/", icon: LayoutDashboard },
       { label: "Cảnh báo", href: "/alarms", icon: Bell },
+      { label: "Lưu lượng khách", href: "/visitors", icon: Users },
       { label: "Phân tích", href: "/analytics", icon: BarChart3 }
     ]
   },

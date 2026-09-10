@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import { AlarmDeleteButton } from "@/components/alarm-delete-button";
 import { AlarmDetail } from "@/components/alarm-detail";
 import { connectMongo } from "@/lib/mongodb";
+import { redactSensitive } from "@/lib/aibox/redact-sensitive";
 import { AlarmModel } from "@/models/alarm";
 import { isValidObjectId } from "mongoose";
 import Link from "next/link";
@@ -50,7 +51,9 @@ export default async function AlarmDetailPage({ params }: AlarmDetailPageProps) 
       </div>
       <AlarmDetail
         alarm={{
-          ...JSON.parse(JSON.stringify(alarm)),
+          // Redact before serializing: everything here crosses to the browser,
+          // and the box payload carries the camera's rtsp url with credentials.
+          ...redactSensitive(JSON.parse(JSON.stringify(alarm))),
           id: String(alarm._id),
           _id: String(alarm._id)
         }}

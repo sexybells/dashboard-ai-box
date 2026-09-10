@@ -101,14 +101,11 @@ export function AlarmTable({
               <td className="px-4 py-3 align-middle">
                 <span className="block font-medium break-words">{alarm.taskSession || "-"}</span>
                 <span className="mt-0.5 block max-w-[280px] truncate text-xs text-muted-foreground">
-                  {alarm.taskDesc || alarm.boardIp || ""}
+                  {alarm.taskDesc || ""}
                 </span>
               </td>
               <td className="px-4 py-3 align-middle">
                 <span className="block font-medium break-words">{alarm.mediaName || "-"}</span>
-                <span className="mt-0.5 block max-w-[280px] truncate text-xs text-muted-foreground">
-                  {alarm.mediaUrl || ""}
-                </span>
               </td>
               <td className="px-4 py-3 align-middle">
                 <span className="block font-medium break-words">{alarm.summary || "-"}</span>

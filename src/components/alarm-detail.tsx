@@ -15,9 +15,7 @@ interface AlarmDetailProps {
     time?: string;
     timeText?: string;
     boardId?: string;
-    boardIp?: string;
     mediaName?: string;
-    mediaUrl?: string;
     imageKind?: string;
     imageUrl?: string | null;
     imageOriginal?: string;
@@ -114,7 +112,6 @@ export function AlarmDetail({ alarm }: AlarmDetailProps) {
           <Row label="Tóm tắt" value={alarm.summary} />
           <Row label="Mô tả" value={alarm.description} />
           <Row label="Camera" value={alarm.mediaName} />
-          <Row label="IP thiết bị" value={alarm.boardIp} />
           <Row label="Mã cảnh báo" value={alarm.alarmId} />
           <Row label="Mã định danh" value={alarm.uniqueId} />
           <Row label="Thời gian" value={alarm.timeText || alarm.time} />

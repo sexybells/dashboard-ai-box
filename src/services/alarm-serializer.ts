@@ -17,9 +17,9 @@ export function serializeAlarmListItem(
     timeText: alarm.timeText,
     timestamp: alarm.timestamp,
     boardId: alarm.boardId,
-    boardIp: alarm.boardIp,
+    // boardIp / mediaUrl stay server-side on purpose: the stream url embeds the
+    // camera password. They are kept in the DB but never sent to the browser.
     mediaName: alarm.mediaName,
-    mediaUrl: alarm.mediaUrl,
     imageKind: alarm.imageKind ?? "none",
     imageUrl: alarm.imageUrl,
     imageOriginal: alarm.imageOriginal,

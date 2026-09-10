@@ -182,7 +182,7 @@ export function OverviewDashboard() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{alarm.summary || alarm.taskSession || "Cảnh báo"}</p>
-                      <p className="truncate text-xs text-muted-foreground">{alarm.mediaName || alarm.boardIp || ""}</p>
+                      <p className="truncate text-xs text-muted-foreground">{alarm.mediaName || ""}</p>
                     </div>
                     <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
                       {formatAlarmTime(alarm.time, alarm.timeText)}

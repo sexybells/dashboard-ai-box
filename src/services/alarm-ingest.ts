@@ -127,9 +127,7 @@ export async function ingestAiBoxWebhook(
       timeText: alarmInput.timeText,
       timestamp: alarmInput.timestamp,
       boardId: alarmInput.boardId,
-      boardIp: alarmInput.boardIp,
       mediaName: alarmInput.mediaName,
-      mediaUrl: alarmInput.mediaUrl,
       imageKind: alarmInput.imageKind,
       imageUrl: alarmInput.imageUrl,
       imageOriginal: alarmInput.imageOriginal

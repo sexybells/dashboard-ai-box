@@ -19,6 +19,9 @@ function isPublicPath(pathname: string): boolean {
     pathname === "/api/webhooks/aibox" ||
     // Cron loopback đồng bộ path MediaMTX — tự gác bằng CAMERA_SYNC_TOKEN.
     pathname === "/api/webhooks/cameras-sync" ||
+    // Cron loopback đẩy lượt khách sang hệ thống khác — tự gác bằng
+    // HEADCOUNT_FORWARD_TOKEN.
+    pathname === "/api/webhooks/headcount-forward" ||
     pathname.startsWith("/_next/") ||
     pathname === "/favicon.ico" ||
     pathname === "/robots.txt" ||

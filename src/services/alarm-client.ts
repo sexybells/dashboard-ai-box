@@ -11,9 +11,7 @@ export interface AlarmListItem {
   timeText?: string;
   timestamp?: number;
   boardId?: string;
-  boardIp?: string;
   mediaName?: string;
-  mediaUrl?: string;
   imageKind: "base64" | "aibox-path" | "none";
   imageUrl?: string | null;
   imageOriginal?: string;

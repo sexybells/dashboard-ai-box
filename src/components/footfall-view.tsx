@@ -84,8 +84,10 @@ export function FootfallView() {
   const axis = axisColor(dark);
   const series = data?.series ?? [];
   const unit = GRANULARITY_OPTIONS.find((o) => o.value === granularity)?.unit ?? "kỳ";
-  // Khách còn ở bên trong: In chưa ghép được Out nào (xem countVisitPairs).
-  const inside = (data?.totalIn ?? 0) - (data?.totalOut ?? 0);
+  // Lượt vào chưa ghép được lượt ra nào. Phải trừ theo visits chứ KHÔNG phải
+  // totalOut: hai camera lệch ngược chiều nhau (cam A 5 vào/1 ra, cam B 1 vào/5
+  // ra) cho totalIn - totalOut = 0 trong khi thực tế còn 4 lượt vào chưa ghép.
+  const unpairedIn = (data?.totalIn ?? 0) - (data?.totalVisits ?? 0);
   const hours = hourly?.hourly ?? [];
 
   return (
@@ -162,7 +164,7 @@ export function FootfallView() {
               label="Tổng lượt vào"
               value={String(data?.totalIn ?? 0)}
               icon={LogIn}
-              hint={inside > 0 ? `${inside} lượt vào chưa có lượt ra` : `${from} → ${to}`}
+              hint={unpairedIn > 0 ? `${unpairedIn} lượt vào chưa có lượt ra` : `${from} → ${to}`}
             />
             <StatCard
               label="Tổng lượt ra"

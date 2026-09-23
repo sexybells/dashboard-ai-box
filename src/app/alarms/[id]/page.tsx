@@ -4,16 +4,20 @@ import { AlarmDetail } from "@/components/alarm-detail";
 import { connectMongo } from "@/lib/mongodb";
 import { redactSensitive } from "@/lib/aibox/redact-sensitive";
 import { AlarmModel } from "@/models/alarm";
+import { alarmListHrefFromDetail } from "@/services/alarm-list-url";
 import { isValidObjectId } from "mongoose";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 interface AlarmDetailPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string | string[] }>;
 }
 
-export default async function AlarmDetailPage({ params }: AlarmDetailPageProps) {
+export default async function AlarmDetailPage({ params, searchParams }: AlarmDetailPageProps) {
   const { id } = await params;
+  // Back to the filtered list view the alarm was opened from.
+  const backHref = alarmListHrefFromDetail((await searchParams).from);
 
   if (!isValidObjectId(id)) {
     notFound();
@@ -37,7 +41,7 @@ export default async function AlarmDetailPage({ params }: AlarmDetailPageProps) 
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2.5">
           <Link
-            href="/alarms"
+            href={backHref}
             className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-card px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
           >
             <ArrowLeft className="size-4" />
@@ -46,6 +50,7 @@ export default async function AlarmDetailPage({ params }: AlarmDetailPageProps) 
           <AlarmDeleteButton
             alarmId={String(alarm._id)}
             alarmLabel={alarm.taskSession || alarm.summary || "Cảnh báo AI Box"}
+            returnHref={backHref}
           />
         </div>
       </div>

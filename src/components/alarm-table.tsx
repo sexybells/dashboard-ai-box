@@ -5,10 +5,13 @@ import Link from "next/link";
 import { Trash2 } from "lucide-react";
 import { formatAlarmTime } from "@/components/alarm-display";
 import type { AlarmListItem } from "@/services/alarm-client";
+import { alarmDetailHref } from "@/services/alarm-list-url";
 import { areAllSelected } from "@/services/alarm-selection";
 
 interface AlarmTableProps {
   alarms: AlarmListItem[];
+  /** Current list view, handed to the detail page so "Quay lại" returns here. */
+  listSearch: string;
   highlightedAlarmIds: ReadonlySet<string>;
   selectedAlarmIds: ReadonlySet<string>;
   isDeleting: boolean;
@@ -30,6 +33,7 @@ function rowClass(highlighted: boolean): string {
 
 export function AlarmTable({
   alarms,
+  listSearch,
   highlightedAlarmIds,
   selectedAlarmIds,
   isDeleting,
@@ -118,7 +122,7 @@ export function AlarmTable({
               </td>
               <td className="px-4 py-3 align-middle">
                 <div className="flex items-center justify-end gap-3 whitespace-nowrap">
-                  <Link className="font-medium text-brand hover:underline" href={`/alarms/${alarm.id}`}>
+                  <Link className="font-medium text-brand hover:underline" href={alarmDetailHref(alarm.id, listSearch)}>
                     Chi tiết
                   </Link>
                   <button

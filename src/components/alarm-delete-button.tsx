@@ -9,9 +9,11 @@ import { deleteAlarms } from "@/services/alarm-client";
 interface AlarmDeleteButtonProps {
   alarmId: string;
   alarmLabel: string;
+  /** List view to return to once the alarm is gone. */
+  returnHref: string;
 }
 
-export function AlarmDeleteButton({ alarmId, alarmLabel }: AlarmDeleteButtonProps) {
+export function AlarmDeleteButton({ alarmId, alarmLabel, returnHref }: AlarmDeleteButtonProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -22,7 +24,7 @@ export function AlarmDeleteButton({ alarmId, alarmLabel }: AlarmDeleteButtonProp
     try {
       await deleteAlarms([alarmId]);
       setIsOpen(false);
-      router.push("/alarms");
+      router.push(returnHref);
       router.refresh();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Xoá cảnh báo thất bại");

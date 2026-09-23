@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Copy, RefreshCw, Trash2 } from "lucide-react";
 import {
   formatAlarmDate,
@@ -38,6 +39,11 @@ import {
   withSelectedOption,
   type AlarmFilterOptions
 } from "@/services/alarm-filter-options";
+import {
+  alarmListHref,
+  buildAlarmListSearch,
+  parseAlarmListState
+} from "@/services/alarm-list-url";
 import { mergeRealtimeAlarm } from "@/services/realtime-alarm-list";
 
 const emptyResponse: AlarmListResponse = {
@@ -64,14 +70,15 @@ function describeAlarm(alarm: AlarmListItem): string {
 }
 
 export function AlarmDashboard() {
-  const [filters, setFilters] = useState<AlarmFilters>({
-    q: "",
-    taskSession: "",
-    summary: "",
-    mediaName: ""
-  });
-  const [searchInput, setSearchInput] = useState("");
-  const [page, setPage] = useState(1);
+  // The view starts from the URL, so coming back from a detail page — by its
+  // "Quay lại" link or the browser's back button — reopens the same filters and
+  // page. useSearchParams (not server props) because a back navigation can
+  // replay a cached render from before the view was written into the URL.
+  const searchParams = useSearchParams();
+  const [initialState] = useState(() => parseAlarmListState(searchParams));
+  const [filters, setFilters] = useState<AlarmFilters>(initialState.filters);
+  const [searchInput, setSearchInput] = useState(initialState.filters.q);
+  const [page, setPage] = useState(initialState.page);
   const [data, setData] = useState<AlarmListResponse>(emptyResponse);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -170,6 +177,17 @@ export function AlarmDashboard() {
       window.clearInterval(timer);
     };
   }, [loadFilterOptions]);
+
+  // Mirror the view into the URL (replace, not push: filtering shouldn't pile
+  // up history entries). Links to a detail page carry the same query back.
+  const listSearch = buildAlarmListSearch({ filters, page });
+  useEffect(() => {
+    if (window.location.search.replace(/^\?/, "") === listSearch) return;
+    // `null` state on purpose: Next.js only syncs its router (and hence what a
+    // back navigation restores) for replaceState calls that don't carry its own
+    // internal history state.
+    window.history.replaceState(null, "", alarmListHref(listSearch));
+  }, [listSearch]);
 
   useEffect(() => {
     filtersRef.current = filters;
@@ -482,6 +500,7 @@ export function AlarmDashboard() {
           >
             <AlarmTable
               alarms={data.data}
+              listSearch={listSearch}
               highlightedAlarmIds={highlightedAlarmIds}
               selectedAlarmIds={selectedAlarmIds}
               isDeleting={isDeleting}

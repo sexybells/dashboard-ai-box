@@ -30,6 +30,15 @@ export async function connectMongo(): Promise<typeof mongoose> {
     bufferCommands: false
   });
 
-  cache.conn = await cache.promise;
+  try {
+    cache.conn = await cache.promise;
+  } catch (error) {
+    // Không xoá thì promise đã reject nằm lại trong cache, và `??=` sẽ không
+    // gán lại — mọi request sau đó await đúng promise hỏng đó, kể cả khi DB đã
+    // sống lại. Xoá đi để lần gọi sau kết nối lại từ đầu.
+    cache.promise = null;
+    throw error;
+  }
+
   return cache.conn;
 }

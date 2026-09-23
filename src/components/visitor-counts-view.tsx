@@ -40,6 +40,7 @@ export function VisitorCountsView() {
   const [from, setFrom] = useState(() => shiftDay(initialTo, -29));
   const [to, setTo] = useState(initialTo);
   const [granularity, setGranularity] = useState<Granularity>("day");
+  const [selectedYear, setSelectedYear] = useState<string>("");
   const [data, setData] = useState<VisitorCountsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +65,15 @@ export function VisitorCountsView() {
     };
   }, [from, to, granularity]);
 
+  const currentYear = Number(todayKey().slice(0, 4));
+  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+  const selectYear = (value: string) => {
+    setSelectedYear(value);
+    if (!value) return;
+    setFrom(`${value}-01-01`);
+    setTo(value === String(currentYear) ? todayKey() : `${value}-12-31`);
+  };
+
   const base = baseChartOptions(dark);
   const axis = axisColor(dark);
   const series = data?.series ?? [];
@@ -79,12 +89,30 @@ export function VisitorCountsView() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            Năm
+            <select
+              value={selectedYear}
+              onChange={(e) => selectYear(e.target.value)}
+              className="rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground"
+            >
+              <option value="">Tùy chọn</option>
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
             Từ
             <input
               type="date"
               value={from}
               max={to}
-              onChange={(e) => setFrom(e.target.value)}
+              onChange={(e) => {
+                setFrom(e.target.value);
+                setSelectedYear("");
+              }}
               className="rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground"
             />
           </label>
@@ -95,7 +123,10 @@ export function VisitorCountsView() {
               value={to}
               min={from}
               max={todayKey()}
-              onChange={(e) => setTo(e.target.value)}
+              onChange={(e) => {
+                setTo(e.target.value);
+                setSelectedYear("");
+              }}
               className="rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground"
             />
           </label>

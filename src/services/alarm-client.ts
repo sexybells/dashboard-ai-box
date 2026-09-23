@@ -1,3 +1,5 @@
+import type { AlarmFilterOptions } from "./alarm-filter-options";
+
 export interface AlarmListItem {
   id: string;
   dedupeKey?: string;
@@ -56,6 +58,17 @@ export async function fetchAlarmList(filters: AlarmFilters, page = 1): Promise<A
   }
 
   return (await response.json()) as AlarmListResponse;
+}
+
+/** Dropdown choices across every stored alarm, not just the page on screen. */
+export async function fetchAlarmFilterOptions(): Promise<AlarmFilterOptions> {
+  const response = await fetch("/api/alarms/filter-options", { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load alarm filter options: ${response.status}`);
+  }
+
+  return (await response.json()) as AlarmFilterOptions;
 }
 
 /** Permanently deletes the given alarms and returns how many were removed. */

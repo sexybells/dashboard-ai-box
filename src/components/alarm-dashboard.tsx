@@ -20,6 +20,7 @@ import { getWebhookUrl } from "@/lib/webhook-url";
 import type { AlarmRealtimeEvent } from "@/services/alarm-events";
 import {
   deleteAlarms,
+  fetchAlarmFilterOptions,
   fetchAlarmList,
   ALARM_PAGE_SIZE,
   type AlarmFilters,
@@ -31,6 +32,12 @@ import {
   toggleAllSelection,
   toggleSelection
 } from "@/services/alarm-selection";
+import {
+  emptyAlarmFilterOptions,
+  mergeAlarmIntoFilterOptions,
+  withSelectedOption,
+  type AlarmFilterOptions
+} from "@/services/alarm-filter-options";
 import { mergeRealtimeAlarm } from "@/services/realtime-alarm-list";
 
 const emptyResponse: AlarmListResponse = {
@@ -45,12 +52,6 @@ const emptyResponse: AlarmListResponse = {
 const inputClass =
   "h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring";
 const labelClass = "grid gap-1.5 text-xs font-medium text-muted-foreground";
-
-function uniqueValues(items: AlarmListItem[], key: keyof AlarmListItem): string[] {
-  return Array.from(
-    new Set(items.map((item) => item[key]).filter((value): value is string => typeof value === "string" && value.length > 0))
-  ).sort((a, b) => a.localeCompare(b));
-}
 
 interface PendingDeletion {
   ids: string[];
@@ -82,6 +83,7 @@ export function AlarmDashboard() {
   const [selectedAlarmIds, setSelectedAlarmIds] = useState<Set<string>>(() => new Set());
   const [pendingDeletion, setPendingDeletion] = useState<PendingDeletion | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [filterOptions, setFilterOptions] = useState<AlarmFilterOptions>(emptyAlarmFilterOptions);
   const dataRef = useRef<AlarmListResponse>(emptyResponse);
   const highlightTimersRef = useRef<number[]>([]);
 
@@ -146,6 +148,29 @@ export function AlarmDashboard() {
     }
   }, [clearHighlightTimers, filters, page]);
 
+  // Dropdown choices span every stored alarm, independent of filters and page.
+  // A failed refresh keeps the previous choices; the list itself reports errors.
+  const loadFilterOptions = useCallback(async () => {
+    try {
+      setFilterOptions(await fetchAlarmFilterOptions());
+    } catch {
+      // keep the last known options
+    }
+  }, []);
+
+  useEffect(() => {
+    const initialTimer = window.setTimeout(() => {
+      void loadFilterOptions();
+    }, 0);
+    const timer = window.setInterval(() => {
+      void loadFilterOptions();
+    }, 30000);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
+  }, [loadFilterOptions]);
+
   useEffect(() => {
     filtersRef.current = filters;
     pageRef.current = page;
@@ -203,6 +228,9 @@ export function AlarmDashboard() {
         loadAlarmsRef.current();
         return;
       }
+
+      const incoming = payload.alarm;
+      setFilterOptions((current) => mergeAlarmIntoFilterOptions(current, incoming));
 
       // Newest alarms belong at the top of page 1; on any other page the list
       // stays put and only the counter moves, so the user keeps their place.
@@ -265,18 +293,19 @@ export function AlarmDashboard() {
       // rows from the next page have to move up, and the page itself may no
       // longer exist. The old rows stay on screen until the new ones arrive,
       // which reads better than blanking the table mid-request.
-      await loadAlarms();
+      // Deleting the last alarm of a type/camera/task retires that choice.
+      await Promise.all([loadAlarms(), loadFilterOptions()]);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Xoá cảnh báo thất bại");
       setPendingDeletion(null);
     } finally {
       setIsDeleting(false);
     }
-  }, [loadAlarms, pendingDeletion]);
+  }, [loadAlarms, loadFilterOptions, pendingDeletion]);
 
-  const taskSessions = uniqueValues(data.data, "taskSession");
-  const summaries = uniqueValues(data.data, "summary");
-  const cameras = uniqueValues(data.data, "mediaName");
+  const taskSessions = withSelectedOption(filterOptions.taskSessions, filters.taskSession);
+  const summaries = withSelectedOption(filterOptions.summaries, filters.summary);
+  const cameras = withSelectedOption(filterOptions.mediaNames, filters.mediaName);
   const hasActiveFilters = Boolean(filters.q || filters.taskSession || filters.summary || filters.mediaName);
   const isInitialLoading = isLoading && data.data.length === 0;
   // The rows on screen still belong to the previous page until the request for
@@ -300,7 +329,10 @@ export function AlarmDashboard() {
           <StatusPill status={realtimeStatus} />
           <button
             type="button"
-            onClick={() => void loadAlarms()}
+            onClick={() => {
+              void loadAlarms();
+              void loadFilterOptions();
+            }}
             className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
           >
             <RefreshCw className="size-4" />
